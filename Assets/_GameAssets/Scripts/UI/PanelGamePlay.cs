@@ -9,10 +9,11 @@ public class PanelGamePlay : PanelBase
     {
         //EventManager.PublishLevelStateChangeEvent(LevelState.LevelInitialize);
         SoundManager.I.PlaySFX(TypeSound.SFX_Click);
-        TransitionGUI.I.ShowTransition(
+        UITransitionScreen.I.ShowTransition(
 () =>
 {
-    SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    GamePlayManager.I.GoToGamePlay();
+
     // stepFinish → chạy sau khi fade-in xong
 });
 
@@ -30,10 +31,10 @@ public class PanelGamePlay : PanelBase
         TransitionGUI.I.ShowTransition(
 () =>
 {
-    //DataManagerTileMatch.NextLevelIndex();
+    GamePlayController.I.NextLevel();
     //EventManager.PublishLevelStateChangeEvent(LevelState.LevelInitialize);
     SoundManager.I.PlaySFX(TypeSound.SFX_Click);
-    SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    GamePlayManager.I.GoToGamePlay();
     DeActiveMe(null);
 });
     }

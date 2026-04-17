@@ -33,16 +33,22 @@ public class GamePlayController : Singleton<GamePlayController>
 
     private void OnGameInit()
     {
-        
+
     }
 
     private void OnGameActive()
     {
-       
+
     }
 
     private void OnGameWin()
     {
+
+    }
+    public void NextLevel()
+    {
+        //LevelManager.I.NextLevel();
+        //logic progresss
 
     }
 

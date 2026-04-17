@@ -36,16 +36,16 @@ public class GamePlayManager : Singleton<GamePlayManager>
     [SerializeField] private VoidEventChannelSO _onChangeCoin;
     [SerializeField] private VoidEventChannelSO _onGoToTestFW;
 
-    public bool SecondPlay ;
+    public bool SecondPlay;
     public TypeStateGame StateGame { get; set; }
     public bool IscanRevive { get; private set; }
 
     public long COIN { get { return DataManager.I.SaveData.Coin; } set { DataManager.I.SaveData.Coin = value; _onChangeCoin.RaiseEvent(); } }
     public int LEVEL { get { return DataManager.I.SaveData.Level; } set { DataManager.I.SaveData.Level = value; } }
 
- 
 
-    
+
+
 
     //
     public List<int> VideoPlayList;
@@ -63,7 +63,7 @@ public class GamePlayManager : Singleton<GamePlayManager>
             VideoPlayList = ES3.Load<List<int>>("VideoPlayList");
 
         }
-        m_isTutModeDIY = ES3.Load<bool>("m_isTutModeDIY",true);
+        m_isTutModeDIY = ES3.Load<bool>("m_isTutModeDIY", true);
         m_isTutModeFWShow = ES3.Load<bool>("m_isTutModeFWShow", true);
         //m_isTutFWIdel = ES3.Load<bool>("m_isTutModeDIY", true);
         m_isTutModeBomb = ES3.Load<bool>("m_isTutModeBomb", true);
@@ -126,12 +126,12 @@ public class GamePlayManager : Singleton<GamePlayManager>
     }
 
     [Button]
-    public void GoToGamePlayDIY()
+    public void GoToGamePlay()
     {
         Application.targetFrameRate = 60;
         QualitySettings.vSyncCount = 0;
         SecondPlay = true;
-       
+
         _loadGamePlayEvent.RaiseEvent(_gamePlayDIY, false);
     }
     public void GoToGamePlayDIYHome()
@@ -139,9 +139,9 @@ public class GamePlayManager : Singleton<GamePlayManager>
         Application.targetFrameRate = 60;
         QualitySettings.vSyncCount = 0;
         SecondPlay = false;
-      
+
         _loadGamePlayEvent.RaiseEvent(_gamePlayDIY, false);
-    }    
+    }
     [Button]
     public void GoToGamePlayFW()
     {
@@ -159,7 +159,7 @@ public class GamePlayManager : Singleton<GamePlayManager>
         QualitySettings.vSyncCount = 0;
         _onGoToTestFW.RaiseEvent();
         _loadGamePlayEvent.RaiseEvent(_gamePlayBomb, false);
-        
+
     }
     //Main
     [Button]
