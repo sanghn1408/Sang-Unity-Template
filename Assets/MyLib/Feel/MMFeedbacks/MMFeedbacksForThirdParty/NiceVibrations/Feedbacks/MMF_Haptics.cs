@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using MoreMountains.Feedbacks;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.FeedbacksForThirdParty
 {
@@ -10,9 +11,13 @@ namespace MoreMountains.FeedbacksForThirdParty
 	/// </summary>
 	[AddComponentMenu("")]
 	[FeedbackPath("Haptics/Haptics DEPRECATED!")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks.NiceVibrations")]
 	[FeedbackHelp("This feedback has been deprecated, and is just here to avoid errors in case you were to update from an old version. Use any of the new haptic feedbacks instead.")]
 	public class MMF_Haptics : MMF_Feedback
 	{
+		/// a static bool used to disable all feedbacks of this type at once
+		public static bool FeedbackTypeAuthorized = true;
+		
 		[Header("Deprecated Feedback")] 
 		/// if this is true, this feedback will output a warning when played
 		public bool OutputDeprecationWarning = true;
@@ -24,7 +29,7 @@ namespace MoreMountains.FeedbacksForThirdParty
 		/// <param name="feedbacksIntensity"></param>
 		protected override void CustomPlayFeedback(Vector3 position, float feedbacksIntensity = 1.0f)
 		{
-			if (!Active)
+			if (!Active || !FeedbackTypeAuthorized)
 			{
 				return;
 			}

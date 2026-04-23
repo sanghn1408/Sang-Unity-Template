@@ -96,7 +96,7 @@ namespace VFolders
                     if (rowIndex < 0) return;
                     if (tree.data == null) return;
 
-                    treeItem = (TreeViewItem)Tree.mi_data_GetItem.Invoke(tree.data, new object[] { rowIndex });
+                    treeItem = tree.GetTreeItemByRow(rowIndex);
 
                 }
                 void set_treeItem_byInstanceId()
@@ -105,9 +105,9 @@ namespace VFolders
                     if (treeItem != null) return;
                     if (isFavorite || isFavoritesRoot) return;
 
-                    var instanceId = typeof(AssetDatabase).InvokeMethod("GetMainAssetOrInProgressProxyInstanceID", guid.ToPath());
+                    var instanceId = typeof(AssetDatabase).InvokeMethod<int>("GetMainAssetOrInProgressProxyInstanceID", guid.ToPath());
 
-                    treeItem = tree.treeViewController.InvokeMethod<TreeViewItem>("FindItem", instanceId);
+                    treeItem = tree.FindItemSafe(instanceId);
 
                 }
 
@@ -666,8 +666,11 @@ namespace VFolders
 #else
                                                tree.treeViewController?.GetMemberValue("state").GetMemberValue<List<int>>("selectedIDs")
 #endif
-                                 .Select(id => tree.treeViewController.InvokeMethod("FindItem", id)                                                 // todo to somethinf else (finditem reveals selected item for some reason)
-                                                                      .GetPropertyValue<string>("Guid", exceptionIfNotFound: false))
+                                 .Select(id => EditorUtility.InstanceIDToObject(id))
+                                 .Where(obj => obj != null)
+                                 .Select(obj => obj.GetPath())
+                                 .Where(path => !path.IsNullOrEmpty())
+                                 .Select(path => path.ToGuid())
                                                                       .Where(r => r != null);
 
 
@@ -1392,13 +1395,41 @@ namespace VFolders
 
             public void UpdateState() // delayCall loop
             {
+                List<int> getExpandedIdsSafe()
+                {
+                    var expandedIdsObject = treeViewController?.GetPropertyValue("state")?.GetPropertyValue("expandedIDs", exceptionIfNotFound: false);
+
+                    if (expandedIdsObject == null) return new List<int>();
+
+                    if (expandedIdsObject is List<int> list)
+                        return list;
+
+                    if (expandedIdsObject is IEnumerable<int> enumerableInts)
+                        return enumerableInts.ToList();
+
+                    if (expandedIdsObject is IEnumerable enumerable)
+                    {
+                        var ids = new List<int>();
+
+                        foreach (var item in enumerable)
+                        {
+                            if (item is int id)
+                                ids.Add(id);
+                        }
+
+                        return ids;
+                    }
+
+                    return new List<int>();
+                }
+
                 isTwoColumns = browser.GetFieldValue<int>("m_ViewMode") == 1;
 
                 treeViewController = browser.GetFieldValue(isTwoColumns ? "m_FolderTree" : "m_AssetTree");
 
                 data = treeViewController?.GetPropertyValue("data");
 
-                expandedIds = treeViewController?.GetPropertyValue("state")?.GetPropertyValue<List<int>>("expandedIDs") ?? new List<int>();
+                expandedIds = getExpandedIdsSafe();
 
 
                 EditorApplication.delayCall -= UpdateState;
@@ -1414,6 +1445,38 @@ namespace VFolders
 
             public List<int> expandedIds = new List<int>();
 
+            public TreeViewItem GetTreeItemByRow(int rowIndex)
+            {
+                if (data == null || rowIndex < 0) return null;
+
+                if (mi_data_GetItem == null)
+                    mi_data_GetItem = data.GetType().GetMethod("GetItem", maxBindingFlags, null, new[] { typeof(int) }, null);
+
+                if (mi_data_GetItem == null) return null;
+
+                try
+                {
+                    return mi_data_GetItem.Invoke(data, new object[] { rowIndex }) as TreeViewItem;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+            public TreeViewItem FindItemSafe(int instanceId)
+            {
+                if (treeViewController == null) return null;
+
+                try
+                {
+                    return treeViewController.InvokeMethod<TreeViewItem>("FindItem", instanceId);
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
 
 
 
@@ -1425,7 +1488,7 @@ namespace VFolders
 
 
 
-            public static MethodInfo mi_data_GetItem = typeof(Editor).Assembly.GetType("UnityEditor.IMGUI.Controls.ITreeViewDataSource").GetMethod("GetItem", maxBindingFlags);
+            public static MethodInfo mi_data_GetItem = typeof(Editor).Assembly.GetType("UnityEditor.IMGUI.Controls.ITreeViewDataSource")?.GetMethod("GetItem", maxBindingFlags);
 
         }
 

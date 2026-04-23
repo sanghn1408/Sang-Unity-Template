@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
+using UnityEngine.Scripting.APIUpdating;
+#if MM_UI
 using UnityEngine.UI;
 
 namespace MoreMountains.Feedbacks
@@ -9,6 +11,7 @@ namespace MoreMountains.Feedbacks
 	/// </summary>
 	[AddComponentMenu("")]
 	[FeedbackHelp("This feedback lets you control the color of a target Text over time.")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
 	[FeedbackPath("UI/Text Color")]
 	public class MMF_TextColor : MMF_Feedback
 	{
@@ -26,6 +29,8 @@ namespace MoreMountains.Feedbacks
 		public override string RequiredTargetText { get { return TargetText != null ? TargetText.name : "";  } }
 		public override string RequiresSetupText { get { return "This feedback requires that a TargetText be set to be able to work properly. You can set one below."; } }
 		#endif
+		public override bool HasAutomatedTargetAcquisition => true;
+		protected override void AutomateTargetAcquisition() => TargetText = FindAutomatedTarget<Text>();
 
 		[MMFInspectorGroup("Target", true, 58, true)]
 		/// the Text component to control
@@ -101,13 +106,14 @@ namespace MoreMountains.Feedbacks
 			switch (ColorMode)
 			{
 				case ColorModes.Instant:
-					TargetText.color = InstantColor;
+					TargetText.color = NormalPlayDirection ? InstantColor : _initialColor;
 					break;
 				case ColorModes.Gradient:
 					if (!AllowAdditivePlays && (_coroutine != null))
 					{
 						return;
 					}
+					if (_coroutine != null) { Owner.StopCoroutine(_coroutine); }
 					_coroutine = Owner.StartCoroutine(ChangeColor());
 					break;
 				case ColorModes.Interpolate:
@@ -115,6 +121,7 @@ namespace MoreMountains.Feedbacks
 					{
 						return;
 					}
+					if (_coroutine != null) { Owner.StopCoroutine(_coroutine); }
 					_coroutine = Owner.StartCoroutine(ChangeColor());
 					break;
 			}
@@ -175,5 +182,19 @@ namespace MoreMountains.Feedbacks
 				_coroutine = null;
 			}
 		}
+
+		/// <summary>
+		/// On restore, we put our object back at its initial position
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+
+			TargetText.color = _initialColor;
+		}
 	}
 }
+#endif

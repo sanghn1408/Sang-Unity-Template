@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using MoreMountains.Tools;
 using UnityEngine;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
@@ -10,7 +11,8 @@ namespace MoreMountains.Feedbacks
 	/// </summary>
 	[AddComponentMenu("")]
 	[FeedbackHelp("This feedback will let you change the speed of a target animator, either once, or instantly and then reset it, or interpolate it over time")]
-	[FeedbackPath("GameObject/Animator Speed")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
+	[FeedbackPath("Animation/Animator Speed")]
 	public class MMF_AnimatorSpeed : MMF_Feedback 
 	{
 		/// a static bool used to disable all feedbacks of this type at once
@@ -18,11 +20,15 @@ namespace MoreMountains.Feedbacks
         
 		/// sets the inspector color for this feedback
 		#if UNITY_EDITOR
-		public override Color FeedbackColor { get { return MMFeedbacksInspectorColors.GameObjectColor; } }
+		public override Color FeedbackColor { get { return MMFeedbacksInspectorColors.AnimationColor; } }
 		public override bool EvaluateRequiresSetup() { return (BoundAnimator == null); }
 		public override string RequiredTargetText { get { return BoundAnimator != null ? BoundAnimator.name : "";  } }
 		public override string RequiresSetupText { get { return "This feedback requires that a BoundAnimator be set to be able to work properly. You can set one below."; } }
 		#endif
+		public override bool HasRandomness => true;
+		public override bool CanForceInitialValue => true;
+		public override bool HasAutomatedTargetAcquisition => true;
+		protected override void AutomateTargetAcquisition() => BoundAnimator = FindAutomatedTarget<Animator>();
 
 		public enum SpeedModes { Once, InstantThenReset, OverTime }
 		
@@ -68,7 +74,7 @@ namespace MoreMountains.Feedbacks
 
 			if (BoundAnimator == null)
 			{
-				Debug.LogWarning("No animator was set for " + Owner.name);
+				Debug.LogWarning("[Animator Speed Feedback] The animator speed feedback on "+Owner.name+" doesn't have a BoundAnimator, it won't work. You need to specify one in its inspector.");
 				return;
 			}
 
@@ -79,10 +85,11 @@ namespace MoreMountains.Feedbacks
 
 			if (Mode == SpeedModes.Once)
 			{
-				BoundAnimator.speed = DetermineNewSpeed();
+				BoundAnimator.speed = ComputeIntensity(DetermineNewSpeed(), position);
 			}
 			else
 			{
+				if (_coroutine != null) { Owner.StopCoroutine(_coroutine); }
 				_coroutine = Owner.StartCoroutine(ChangeSpeedCo());
 			}
 		}
@@ -142,6 +149,19 @@ namespace MoreMountains.Feedbacks
 			if (_coroutine != null)
 			{
 				Owner.StopCoroutine(_coroutine);	
+			}
+
+			BoundAnimator.speed = _initialSpeed;
+		}
+		
+		/// <summary>
+		/// On restore, we restore our initial state
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
 			}
 
 			BoundAnimator.speed = _initialSpeed;

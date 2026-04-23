@@ -16,7 +16,7 @@ namespace MoreMountains.FeedbacksForThirdParty
 	#if MM_URP
 	[RequireComponent(typeof(Volume))]
 	#endif
-	[AddComponentMenu("More Mountains/Feedbacks/Shakers/PostProcessing/MMLensDistortionShaker_URP")]
+	[AddComponentMenu("More Mountains/Feedbacks/Shakers/PostProcessing/MM Lens Distortion Shaker URP")]
 	public class MMLensDistortionShaker_URP : MMShaker
 	{
 		[MMInspectorGroup("Lens Distortion Intensity", true, 51)]
@@ -99,9 +99,10 @@ namespace MoreMountains.FeedbacksForThirdParty
 		/// <param name="attenuation"></param>
 		/// <param name="channel"></param>
 		public virtual void OnMMLensDistortionShakeEvent(AnimationCurve intensity, float duration, float remapMin, float remapMax, bool relativeIntensity = false,
-			float attenuation = 1.0f, int channel = 0, bool resetShakerValuesAfterShake = true, bool resetTargetValuesAfterShake = true, bool forwardDirection = true, TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false)
+			float attenuation = 1.0f, MMChannelData channelData = null, bool resetShakerValuesAfterShake = true, bool resetTargetValuesAfterShake = true, 
+			bool forwardDirection = true, TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false, bool restore = false)
 		{
-			if (!CheckEventAllowed(channel) || (!Interruptible && Shaking))
+			if (!CheckEventAllowed(channelData) || (!Interruptible && Shaking))
 			{
 				return;
 			}
@@ -109,6 +110,12 @@ namespace MoreMountains.FeedbacksForThirdParty
 			if (stop)
 			{
 				Stop();
+				return;
+			}
+
+			if (restore)
+			{
+				ResetTargetValues();
 				return;
 			}
 	            
@@ -124,13 +131,16 @@ namespace MoreMountains.FeedbacksForThirdParty
 				_originalRelativeIntensity = RelativeIntensity;
 			}
 
-			TimescaleMode = timescaleMode;
-			ShakeDuration = duration;
-			ShakeIntensity = intensity;
-			RemapIntensityZero = remapMin * attenuation;
-			RemapIntensityOne = remapMax * attenuation;
-			RelativeIntensity = relativeIntensity;
-			ForwardDirection = forwardDirection;
+			if (!OnlyUseShakerValues)
+			{
+				TimescaleMode = timescaleMode;
+				ShakeDuration = duration;
+				ShakeIntensity = intensity;
+				RemapIntensityZero = remapMin * attenuation;
+				RemapIntensityOne = remapMax * attenuation;
+				RelativeIntensity = relativeIntensity;
+				ForwardDirection = forwardDirection;
+			}
 
 			Play();
 		}
@@ -182,21 +192,21 @@ namespace MoreMountains.FeedbacksForThirdParty
 	/// </summary>
 	public struct MMLensDistortionShakeEvent_URP
 	{
-		public delegate void Delegate(AnimationCurve intensity, float duration, float remapMin, float remapMax, bool relativeIntensity = false,
-			float attenuation = 1.0f, int channel = 0, bool resetShakerValuesAfterShake = true, bool resetTargetValuesAfterShake = true, bool forwardDirection = true, TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false);
 		static private event Delegate OnEvent;
-		static public void Register(Delegate callback)
-		{
-			OnEvent += callback;
-		}
-		static public void Unregister(Delegate callback)
-		{
-			OnEvent -= callback;
-		}
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)] private static void RuntimeInitialization() { OnEvent = null; }
+		static public void Register(Delegate callback) { OnEvent += callback; }
+		static public void Unregister(Delegate callback) { OnEvent -= callback; }
+
+		public delegate void Delegate(AnimationCurve intensity, float duration, float remapMin, float remapMax, bool relativeIntensity = false,
+			float attenuation = 1.0f, MMChannelData channelData = null, bool resetShakerValuesAfterShake = true, bool resetTargetValuesAfterShake = true, 
+			bool forwardDirection = true, TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false, bool restore = false);
+		
 		static public void Trigger(AnimationCurve intensity, float duration, float remapMin, float remapMax, bool relativeIntensity = false,
-			float attenuation = 1.0f, int channel = 0, bool resetShakerValuesAfterShake = true, bool resetTargetValuesAfterShake = true, bool forwardDirection = true, TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false)
+			float attenuation = 1.0f, MMChannelData channelData = null, bool resetShakerValuesAfterShake = true, bool resetTargetValuesAfterShake = true, 
+			bool forwardDirection = true, TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false, bool restore = false)
 		{
-			OnEvent?.Invoke(intensity, duration, remapMin, remapMax, relativeIntensity, attenuation, channel, resetShakerValuesAfterShake, resetTargetValuesAfterShake, forwardDirection, timescaleMode, stop);
+			OnEvent?.Invoke(intensity, duration, remapMin, remapMax, relativeIntensity, attenuation, channelData, 
+				resetShakerValuesAfterShake, resetTargetValuesAfterShake, forwardDirection, timescaleMode, stop, restore);
 		}
 	}
 }

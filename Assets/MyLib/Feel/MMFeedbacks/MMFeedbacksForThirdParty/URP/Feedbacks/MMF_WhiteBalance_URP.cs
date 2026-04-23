@@ -1,7 +1,9 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using MoreMountains.Feedbacks;
+using UnityEngine.Scripting.APIUpdating;
+#if MM_URP
+using UnityEngine.Rendering.Universal;
+#endif
 
 namespace MoreMountains.FeedbacksForThirdParty
 {
@@ -16,6 +18,7 @@ namespace MoreMountains.FeedbacksForThirdParty
 	#if MM_URP
 	[FeedbackPath("PostProcess/White Balance URP")]
 	#endif
+	[MovedFrom(false, null, "MoreMountains.Feedbacks.URP")]
 	public class MMF_WhiteBalance_URP : MMF_Feedback
 	{
 		/// a static bool used to disable all feedbacks of this type at once
@@ -23,11 +26,14 @@ namespace MoreMountains.FeedbacksForThirdParty
 		/// sets the inspector color for this feedback
 		#if UNITY_EDITOR
 		public override Color FeedbackColor { get { return MMFeedbacksInspectorColors.PostProcessColor; } }
+		public override bool HasCustomInspectors => true;
+		public override bool HasAutomaticShakerSetup => true;
 		#endif
 
 		/// the duration of this feedback is the duration of the shake
 		public override float FeedbackDuration { get { return ApplyTimeMultiplier(ShakeDuration); } set { ShakeDuration = value; } }
 		public override bool HasChannel => true;
+		public override bool HasRandomness => true;
 
 		[MMFInspectorGroup("White Balance", true, 29)]
 		/// the duration of the shake, in seconds
@@ -81,10 +87,10 @@ namespace MoreMountains.FeedbacksForThirdParty
 				return;
 			}
             
-			float intensityMultiplier = Timing.ConstantIntensity ? 1f : feedbacksIntensity;
+			float intensityMultiplier = ComputeIntensity(feedbacksIntensity, position);
 			MMWhiteBalanceShakeEvent_URP.Trigger(ShakeTemperature, FeedbackDuration, RemapTemperatureZero, RemapTemperatureOne,
 				ShakeTint, RemapTintZero, RemapTintOne, RelativeValues, intensityMultiplier,
-				Channel, ResetShakerValuesAfterShake, ResetTargetValuesAfterShake, NormalPlayDirection, Timing.TimescaleMode);
+				ChannelData, ResetShakerValuesAfterShake, ResetTargetValuesAfterShake, NormalPlayDirection, ComputedTimescaleMode);
             
 		}
         
@@ -103,8 +109,31 @@ namespace MoreMountains.FeedbacksForThirdParty
 			base.CustomStopFeedback(position, feedbacksIntensity);
             
 			MMWhiteBalanceShakeEvent_URP.Trigger(ShakeTemperature, FeedbackDuration, RemapTemperatureZero, RemapTemperatureOne,
-				ShakeTint, RemapTintZero, RemapTintOne, RelativeValues, stop: true, channel: Channel);
-            
+				ShakeTint, RemapTintZero, RemapTintOne, RelativeValues, stop: true, channelData: ChannelData);
+		}
+
+		/// <summary>
+		/// On restore, we put our object back at its initial position
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+			
+			MMWhiteBalanceShakeEvent_URP.Trigger(ShakeTemperature, FeedbackDuration, RemapTemperatureZero, RemapTemperatureOne,
+				ShakeTint, RemapTintZero, RemapTintOne, RelativeValues, restore: true, channelData: ChannelData);
+		}
+		
+		/// <summary>
+		/// Automaticall sets up the post processing profile and shaker
+		/// </summary>
+		public override void AutomaticShakerSetup()
+		{
+			#if MM_URP && UNITY_EDITOR
+			MMURPHelpers.GetOrCreateVolume<WhiteBalance, MMWhiteBalanceShaker_URP>(Owner, "WhiteBalance");
+			#endif
 		}
 	}
 }

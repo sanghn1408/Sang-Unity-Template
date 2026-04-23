@@ -1,7 +1,7 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿#if MM_UI
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
@@ -10,6 +10,7 @@ namespace MoreMountains.Feedbacks
 	/// </summary>
 	[AddComponentMenu("")]
 	[FeedbackHelp("This feedback will let you trigger cross fades on a target Graphic.")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
 	[FeedbackPath("UI/Graphic CrossFade")]
 	public class MMF_GraphicCrossFade : MMF_Feedback
 	{
@@ -26,6 +27,8 @@ namespace MoreMountains.Feedbacks
 		/// the duration of this feedback is the duration of the Image, or 0 if instant
 		public override float FeedbackDuration { get { return ApplyTimeMultiplier(Duration); } set { Duration = value; } }
 		public override bool HasChannel => true;
+		public override bool HasAutomatedTargetAcquisition => true;
+		protected override void AutomateTargetAcquisition() => TargetGraphic = FindAutomatedTarget<Graphic>();
 
 		/// the possible modes for this feedback
 		public enum Modes { Alpha, Color }
@@ -54,10 +57,20 @@ namespace MoreMountains.Feedbacks
 		public bool UseAlpha = true;
 		/// if this is true, the target will be disabled when this feedbacks is stopped
 		[Tooltip("if this is true, the target will be disabled when this feedbacks is stopped")] 
-		public bool DisableOnStop = true;
+		public bool DisableOnStop = false;
         
 		protected Coroutine _coroutine;
 		protected Color _initialColor;
+		
+		protected override void CustomInitialization(MMF_Player owner)
+		{
+			base.CustomInitialization(owner);
+
+			if (TargetGraphic != null)
+			{
+				_initialColor = TargetGraphic.color;	
+			}
+		}
         
 		/// <summary>
 		/// On Play we turn our Graphic on and start an over time coroutine if needed
@@ -72,20 +85,19 @@ namespace MoreMountains.Feedbacks
 			}
         
 			Turn(true);
-			bool ignoreTimeScale = Timing.TimescaleMode == TimescaleModes.Unscaled;
+			bool ignoreTimeScale = !InScaledTimescaleMode;
 			switch (Mode)
 			{
 				case Modes.Alpha:
 					// the following lines fix a bug with CrossFadeAlpha
-					_initialColor = TargetGraphic.color;
-					_initialColor.a = 1;
-					TargetGraphic.color = _initialColor;
-					TargetGraphic.CrossFadeAlpha(0f, 0f, true);
+					_initialColor.a = NormalPlayDirection ? 1 : 0;
+					TargetGraphic.color = NormalPlayDirection ? _initialColor : TargetColor;
+					TargetGraphic.CrossFadeAlpha(NormalPlayDirection ? 0f : 1f, 0f, true);
 	                
-					TargetGraphic.CrossFadeAlpha(TargetAlpha, Duration, ignoreTimeScale);
+					TargetGraphic.CrossFadeAlpha(NormalPlayDirection ? TargetAlpha : _initialColor.a, Duration, ignoreTimeScale);
 					break;
 				case Modes.Color:
-					TargetGraphic.CrossFadeColor(TargetColor, Duration, ignoreTimeScale, UseAlpha);
+					TargetGraphic.CrossFadeColor(NormalPlayDirection ? TargetColor : _initialColor, Duration, ignoreTimeScale, UseAlpha);
 					break;
 			}
 		}
@@ -118,5 +130,18 @@ namespace MoreMountains.Feedbacks
 			TargetGraphic.gameObject.SetActive(status);
 			TargetGraphic.enabled = status;
 		}
+		
+		/// <summary>
+		/// On restore, we restore our initial state
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+			TargetGraphic.color = _initialColor;
+		}
 	}
 }
+#endif

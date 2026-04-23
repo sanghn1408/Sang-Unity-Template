@@ -10,7 +10,7 @@ namespace MoreMountains.FeedbacksForThirdParty
 	/// <summary>
 	/// Add this class to a Camera with a bloom post processing and it'll be able to "shake" its values by getting events
 	/// </summary>
-	[AddComponentMenu("More Mountains/Feedbacks/Shakers/PostProcessing/MMBloomShaker")]
+	[AddComponentMenu("More Mountains/Feedbacks/Shakers/PostProcessing/MM Bloom Shaker")]
 	#if MM_POSTPROCESSING
 	[RequireComponent(typeof(PostProcessVolume))]
 	#endif
@@ -96,9 +96,9 @@ namespace MoreMountains.FeedbacksForThirdParty
 		/// <param name="channel"></param>
 		public virtual void OnBloomShakeEvent(AnimationCurve intensity, float duration, float remapMin, float remapMax,
 			AnimationCurve threshold, float remapThresholdMin, float remapThresholdMax, bool relativeIntensity = false,
-			float feedbacksIntensity = 1.0f, int channel = 0, bool resetShakerValuesAfterShake = true, bool resetTargetValuesAfterShake = true, bool forwardDirection = true, TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false)
+			float feedbacksIntensity = 1.0f, MMChannelData channelData = null, bool resetShakerValuesAfterShake = true, bool resetTargetValuesAfterShake = true, bool forwardDirection = true, TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false, bool restore = false)
 		{
-			if (!CheckEventAllowed(channel) || (!Interruptible && Shaking))
+			if (!CheckEventAllowed(channelData) || (!Interruptible && Shaking))
 			{
 				return;
 			}
@@ -106,6 +106,12 @@ namespace MoreMountains.FeedbacksForThirdParty
 			if (stop)
 			{
 				Stop();
+				return;
+			}
+
+			if (restore)
+			{
+				ResetTargetValues();
 				return;
 			}
 
@@ -124,16 +130,19 @@ namespace MoreMountains.FeedbacksForThirdParty
 				_originalRemapThresholdOne = RemapThresholdOne;
 			}
 
-			TimescaleMode = timescaleMode;
-			ShakeDuration = duration;
-			ShakeIntensity = intensity;
-			RemapIntensityZero = remapMin * feedbacksIntensity;
-			RemapIntensityOne = remapMax * feedbacksIntensity;
-			RelativeValues = relativeIntensity;
-			ShakeThreshold = threshold;
-			RemapThresholdZero = remapThresholdMin;
-			RemapThresholdOne = remapThresholdMax;
-			ForwardDirection = forwardDirection;
+			if (!OnlyUseShakerValues)
+			{
+				TimescaleMode = timescaleMode;
+				ShakeDuration = duration;
+				ShakeIntensity = intensity;
+				RemapIntensityZero = remapMin * feedbacksIntensity;
+				RemapIntensityOne = remapMax * feedbacksIntensity;
+				RelativeValues = relativeIntensity;
+				ShakeThreshold = threshold;
+				RemapThresholdZero = remapThresholdMin;
+				RemapThresholdOne = remapThresholdMax;
+				ForwardDirection = forwardDirection;
+			}
 
 			Play();
 		}
@@ -189,27 +198,23 @@ namespace MoreMountains.FeedbacksForThirdParty
 	/// </summary>
 	public struct MMBloomShakeEvent
 	{
+		static private event Delegate OnEvent;
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)] private static void RuntimeInitialization() { OnEvent = null; }
+		static public void Register(Delegate callback) { OnEvent += callback; }
+		static public void Unregister(Delegate callback) { OnEvent -= callback; }
+		
 		public delegate void Delegate(AnimationCurve intensity, float duration, float remapMin, float remapMax,
 			AnimationCurve threshold, float remapThresholdMin, float remapThresholdMax, bool relativeIntensity = false,
-			float feedbacksIntensity = 1.0f, int channel = 0, bool resetShakerValuesAfterShake = true, bool resetTargetValuesAfterShake = true, bool forwardDirection = true, TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false);
-		static private event Delegate OnEvent;
-
-		static public void Register(Delegate callback)
-		{
-			OnEvent += callback;
-		}
-
-		static public void Unregister(Delegate callback)
-		{
-			OnEvent -= callback;
-		}
+			float feedbacksIntensity = 1.0f, MMChannelData channelData = null, bool resetShakerValuesAfterShake = true, 
+			bool resetTargetValuesAfterShake = true, bool forwardDirection = true, TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false, bool restore = false);
 
 		static public void Trigger(AnimationCurve intensity, float duration, float remapMin, float remapMax,
 			AnimationCurve threshold, float remapThresholdMin, float remapThresholdMax, bool relativeIntensity = false,
-			float feedbacksIntensity = 1.0f, int channel = 0, bool resetShakerValuesAfterShake = true, bool resetTargetValuesAfterShake = true, bool forwardDirection = true, TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false)
+			float feedbacksIntensity = 1.0f, MMChannelData channelData = null, bool resetShakerValuesAfterShake = true, 
+			bool resetTargetValuesAfterShake = true, bool forwardDirection = true, TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false, bool restore = false)
 		{
 			OnEvent?.Invoke(intensity, duration, remapMin, remapMax, threshold, remapThresholdMin, remapThresholdMax, relativeIntensity,
-				feedbacksIntensity, channel, resetShakerValuesAfterShake, resetTargetValuesAfterShake, forwardDirection, timescaleMode, stop);
+				feedbacksIntensity, channelData, resetShakerValuesAfterShake, resetTargetValuesAfterShake, forwardDirection, timescaleMode, stop, restore);
 		}
 	}
 }

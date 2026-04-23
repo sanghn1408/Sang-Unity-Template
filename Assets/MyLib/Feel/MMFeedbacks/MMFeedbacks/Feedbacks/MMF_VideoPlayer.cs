@@ -1,8 +1,6 @@
-﻿using System;
-using UnityEngine;
-using System.Collections;
-using UnityEngine.UI;
+﻿using UnityEngine;
 using UnityEngine.Video;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
@@ -11,6 +9,7 @@ namespace MoreMountains.Feedbacks
 	/// </summary>
 	[AddComponentMenu("")]
 	[FeedbackHelp("This feedback lets you control video players in all sorts of ways (Play, Pause, Toggle, Stop, Prepare, StepForward, StepBackward, SetPlaybackSpeed, SetDirectAudioVolume, SetDirectAudioMute, GoToFrame, ToggleLoop)")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
 	[FeedbackPath("UI/Video Player")]
 	public class MMF_VideoPlayer : MMF_Feedback
 	{
@@ -25,6 +24,8 @@ namespace MoreMountains.Feedbacks
 		public override string RequiredTargetText { get { return TargetVideoPlayer != null ? TargetVideoPlayer.name + " " + VideoAction.ToString() : "";  } }
 		public override string RequiresSetupText { get { return "This feedback requires that a TargetVideoPlayer be set to be able to work properly. You can set one below."; } }
 		#endif
+		public override bool HasAutomatedTargetAcquisition => true;
+		protected override void AutomateTargetAcquisition() => TargetVideoPlayer = FindAutomatedTarget<VideoPlayer>();
 
 		[MMFInspectorGroup("Video Player", true, 58, true)]
 		/// the Video Player to control with this feedback

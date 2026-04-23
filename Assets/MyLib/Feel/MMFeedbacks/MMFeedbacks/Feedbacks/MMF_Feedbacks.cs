@@ -1,29 +1,35 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
 	/// <summary>
-	/// This feedback allows you to trigger a target MMFeedbacks, or any MMFeedbacks on the specified Channel within a certain range. You'll need an MMFeedbacksShaker on them.
+	/// This feedback allows you to trigger a target MMF_Player, or any MMF_Player on the specified Channel within a certain range. You'll need an MMFeedbacksShaker on them.
 	/// </summary>
 	[AddComponentMenu("")]
-	[FeedbackHelp("This feedback allows you to trigger a target MMFeedbacks, or any MMFeedbacks on the specified Channel within a certain range. You'll need an MMFeedbacksShaker on them.")]
-	[FeedbackPath("GameObject/Feedbacks Player")]
+	[FeedbackHelp("This feedback allows you to trigger a target MMF_Player, or any MMF_Player on the specified Channel within a certain range. You'll need an MMFeedbacksShaker on them.")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
+	[FeedbackPath("Feedbacks/Feedbacks Player")]
 	public class MMF_Feedbacks : MMF_Feedback
 	{
 		/// a static bool used to disable all feedbacks of this type at once
 		public static bool FeedbackTypeAuthorized = true;
 		/// sets the inspector color for this feedback
 		#if UNITY_EDITOR
-		public override Color FeedbackColor { get { return MMFeedbacksInspectorColors.GameObjectColor; } }
-		public override string RequiredTargetText { get { return "Channel "+Channel;  } }
+		public override Color FeedbackColor { get { return MMFeedbacksInspectorColors.FeedbacksColor; } }
+		public override string RequiredTargetText => RequiredChannelText;
 		#endif
-		/// the duration of this feedback is the duration of the light, or 0 if instant
+		/// the duration of this feedback is the duration of our target feedback
 		public override float FeedbackDuration 
 		{
 			get
 			{
+				if (TargetFeedbacks == Owner)
+				{
+					return 0f;
+				}
 				if ((Mode == Modes.PlayTargetFeedbacks) && (TargetFeedbacks != null))
 				{
 					return TargetFeedbacks.TotalDuration;
@@ -52,7 +58,7 @@ namespace MoreMountains.Feedbacks
 		/// whether or not to use a range
 		[MMFEnumCondition("Mode", (int)Modes.PlayFeedbacksInArea)]
 		[Tooltip("whether or not to use a range")]
-		public bool UseRange = false;
+		public bool OnlyTriggerPlayersInRange = false;
 		/// the range of the event, in units
 		[MMFEnumCondition("Mode", (int)Modes.PlayFeedbacksInArea)]
 		[Tooltip("the range of the event, in units")]
@@ -77,12 +83,17 @@ namespace MoreMountains.Feedbacks
 		}
 
 		/// <summary>
-		/// On Play we turn our light on and start an over time coroutine if needed
+		/// On Play we trigger our target feedback or trigger a feedback shake event to shake feedbacks in the area
 		/// </summary>
 		/// <param name="position"></param>
 		/// <param name="feedbacksIntensity"></param>
 		protected override void CustomPlayFeedback(Vector3 position, float feedbacksIntensity = 1.0f)
 		{
+			if (TargetFeedbacks == Owner)
+			{
+				return;
+			}
+			
 			if (!Active || !FeedbackTypeAuthorized)
 			{
 				return;
@@ -90,7 +101,7 @@ namespace MoreMountains.Feedbacks
 
 			if (Mode == Modes.PlayFeedbacksInArea)
 			{
-				MMFeedbacksShakeEvent.Trigger(Channel, UseRange, EventRange, EventOriginTransform.position);    
+				MMFeedbacksShakeEvent.Trigger(ChannelData, OnlyTriggerPlayersInRange, EventRange, EventOriginTransform.position);    
 			}
 			else if (Mode == Modes.PlayTargetFeedbacks)
 			{

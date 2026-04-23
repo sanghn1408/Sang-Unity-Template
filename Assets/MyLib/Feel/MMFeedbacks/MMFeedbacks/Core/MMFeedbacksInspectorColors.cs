@@ -21,6 +21,9 @@ namespace MoreMountains.Feedbacks
 		public static Color32 UIColor = new Color32(225, 2, 65, 255);
 		public static Color32 TMPColor = new Color32(135, 206, 250, 255);
 		public static Color32 HapticsColor = new Color32(61, 206, 250, 255);
+		public static Color32 FeedbacksColor = new Color32(105, 32, 133, 255);
+		public static Color32 AnimationColor = new Color32(200, 48, 128, 255);
+		public static Color32 SpringColor = new Color32(221, 230, 128, 255);
 
 		public static Color32 PauseColor = new Color32(98, 115, 0, 255);
 		public static Color32 HoldingPauseColor = new Color32(0, 114, 61, 255);

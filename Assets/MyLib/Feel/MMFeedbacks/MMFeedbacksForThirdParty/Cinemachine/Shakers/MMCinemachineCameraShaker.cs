@@ -2,24 +2,41 @@
 using UnityEngine;
 #if MM_CINEMACHINE
 using Cinemachine;
+#elif MM_CINEMACHINE3
+using Unity.Cinemachine;
 #endif
 using MoreMountains.Feedbacks;
+using MoreMountains.Tools;
 
 namespace MoreMountains.FeedbacksForThirdParty
 {
 	/// <summary>
 	/// Add this component to your Cinemachine Virtual Camera to have it shake when calling its ShakeCamera methods.
 	/// </summary>
-	[AddComponentMenu("More Mountains/Feedbacks/Shakers/Cinemachine/MMCinemachineCameraShaker")]
+	[AddComponentMenu("More Mountains/Feedbacks/Shakers/Cinemachine/MM Cinemachine Camera Shaker")]
 	#if MM_CINEMACHINE
 	[RequireComponent(typeof(CinemachineVirtualCamera))]
+	#elif MM_CINEMACHINE3
+	[RequireComponent(typeof(CinemachineCamera))]
 	#endif
-	public class MMCinemachineCameraShaker : MonoBehaviour
+	public class MMCinemachineCameraShaker : MonoBehaviour 
 	{
 		[Header("Settings")]
-		/// the channel to receive events on
-		[Tooltip("the channel to receive events on")]
+		/// whether to listen on a channel defined by an int or by a MMChannel scriptable object. Ints are simple to setup but can get messy and make it harder to remember what int corresponds to what.
+		/// MMChannel scriptable objects require you to create them in advance, but come with a readable name and are more scalable
+		[Tooltip("whether to listen on a channel defined by an int or by a MMChannel scriptable object. Ints are simple to setup but can get messy and make it harder to remember what int corresponds to what. " +
+		         "MMChannel scriptable objects require you to create them in advance, but come with a readable name and are more scalable")]
+		public MMChannelModes ChannelMode = MMChannelModes.Int;
+		/// the channel to listen to - has to match the one on the feedback
+		[Tooltip("the channel to listen to - has to match the one on the feedback")]
+		[MMFEnumCondition("ChannelMode", (int)MMChannelModes.Int)]
 		public int Channel = 0;
+		/// the MMChannel definition asset to use to listen for events. The feedbacks targeting this shaker will have to reference that same MMChannel definition to receive events - to create a MMChannel,
+		/// right click anywhere in your project (usually in a Data folder) and go MoreMountains > MMChannel, then name it with some unique name
+		[Tooltip("the MMChannel definition asset to use to listen for events. The feedbacks targeting this shaker will have to reference that same MMChannel definition to receive events - to create a MMChannel, " +
+		         "right click anywhere in your project (usually in a Data folder) and go MoreMountains > MMChannel, then name it with some unique name")]
+		[MMFEnumCondition("ChannelMode", (int)MMChannelModes.MMChannel)]
+		public MMChannel MMChannelDefinition = null;
 		/// The default amplitude that will be applied to your shakes if you don't specify one
 		[Tooltip("The default amplitude that will be applied to your shakes if you don't specify one")]
 		public float DefaultShakeAmplitude = .5f;
@@ -52,15 +69,19 @@ namespace MoreMountains.FeedbacksForThirdParty
 		[MMFInspectorButton("TestShake")]
 		public bool TestShakeButton;
 
-		#if MM_CINEMACHINE
 		public virtual float GetTime() { return (_timescaleMode == TimescaleModes.Scaled) ? Time.time : Time.unscaledTime; }
 		public virtual float GetDeltaTime() { return (_timescaleMode == TimescaleModes.Scaled) ? Time.deltaTime : Time.unscaledDeltaTime; }
 
 		protected TimescaleModes _timescaleMode;
 		protected Vector3 _initialPosition;
 		protected Quaternion _initialRotation;
+		#if MM_CINEMACHINE
 		protected Cinemachine.CinemachineBasicMultiChannelPerlin _perlin;
 		protected Cinemachine.CinemachineVirtualCamera _virtualCamera;
+		#elif MM_CINEMACHINE3
+		protected CinemachineBasicMultiChannelPerlin _perlin;
+		protected CinemachineCamera _virtualCamera;
+		#endif
 		protected float _targetAmplitude;
 		protected float _targetFrequency;
 		private Coroutine _shakeCoroutine;
@@ -70,8 +91,13 @@ namespace MoreMountains.FeedbacksForThirdParty
 		/// </summary>
 		protected virtual void Awake()
 		{
+			#if MM_CINEMACHINE
 			_virtualCamera = this.gameObject.GetComponent<CinemachineVirtualCamera>();
 			_perlin = _virtualCamera.GetCinemachineComponent<Cinemachine.CinemachineBasicMultiChannelPerlin>();
+			#elif MM_CINEMACHINE3
+			_virtualCamera = this.gameObject.GetComponent<CinemachineCamera>();
+			_perlin = _virtualCamera.GetCinemachineComponent(CinemachineCore.Stage.Noise) as CinemachineBasicMultiChannelPerlin;
+			#endif
 		}
 
 		/// <summary>
@@ -79,11 +105,18 @@ namespace MoreMountains.FeedbacksForThirdParty
 		/// </summary>
 		protected virtual void Start()
 		{
+			#if MM_CINEMACHINE || MM_CINEMACHINE3
 			if (_perlin != null)
 			{
+				#if MM_CINEMACHINE
 				IdleAmplitude = _perlin.m_AmplitudeGain;
 				IdleFrequency = _perlin.m_FrequencyGain;
+				#elif MM_CINEMACHINE3
+				IdleAmplitude = _perlin.AmplitudeGain;
+				IdleFrequency = _perlin.FrequencyGain;
+				#endif
 			}            
+			#endif
 
 			_targetAmplitude = IdleAmplitude;
 			_targetFrequency = IdleFrequency;
@@ -91,11 +124,19 @@ namespace MoreMountains.FeedbacksForThirdParty
 
 		protected virtual void Update()
 		{
+			#if MM_CINEMACHINE
 			if (_perlin != null)
 			{
 				_perlin.m_AmplitudeGain = _targetAmplitude;
 				_perlin.m_FrequencyGain = Mathf.Lerp(_perlin.m_FrequencyGain, _targetFrequency, GetDeltaTime() * LerpSpeed);
 			}
+			#elif MM_CINEMACHINE3
+			if (_perlin != null)
+			{
+				_perlin.AmplitudeGain = _targetAmplitude;
+				_perlin.FrequencyGain = Mathf.Lerp(_perlin.FrequencyGain, _targetFrequency, GetDeltaTime() * LerpSpeed);
+			}
+			#endif
 		}
 
 		/// <summary>
@@ -136,7 +177,7 @@ namespace MoreMountains.FeedbacksForThirdParty
 			_timescaleMode = useUnscaledTime ? TimescaleModes.Unscaled : TimescaleModes.Scaled;
 			if (!infinite)
 			{
-				yield return new WaitForSeconds(duration);
+				yield return MMCoroutine.WaitFor(duration);
 				CameraReset();
 			}                        
 		}
@@ -150,18 +191,18 @@ namespace MoreMountains.FeedbacksForThirdParty
 			_targetFrequency = IdleFrequency;
 		}
 
-		public virtual void OnCameraShakeEvent(float duration, float amplitude, float frequency, float amplitudeX, float amplitudeY, float amplitudeZ, bool infinite, int channel, bool useUnscaledTime)
+		public virtual void OnCameraShakeEvent(float duration, float amplitude, float frequency, float amplitudeX, float amplitudeY, float amplitudeZ, bool infinite, MMChannelData channelData, bool useUnscaledTime)
 		{
-			if ((channel != Channel) && (channel != -1) && (Channel != -1))
+			if (!MMChannel.Match(channelData, ChannelMode, Channel, MMChannelDefinition))
 			{
 				return;
 			}
 			this.ShakeCamera(duration, amplitude, frequency, infinite, useUnscaledTime);
 		}
 
-		public virtual void OnCameraShakeStopEvent(int channel)
+		public virtual void OnCameraShakeStopEvent(MMChannelData channelData)
 		{
-			if ((channel != Channel) && (channel != -1) && (Channel != -1))
+			if (!MMChannel.Match(channelData, ChannelMode, Channel, MMChannelDefinition))
 			{
 				return;
 			}
@@ -186,8 +227,7 @@ namespace MoreMountains.FeedbacksForThirdParty
 
 		protected virtual void TestShake()
 		{
-			MMCameraShakeEvent.Trigger(TestDuration, TestAmplitude, TestFrequency, 0f, 0f, 0f, false, 0);
+			MMCameraShakeEvent.Trigger(TestDuration, TestAmplitude, TestFrequency, 0f, 0f, 0f, false, new MMChannelData(ChannelMode, Channel, MMChannelDefinition));
 		}
-		#endif
 	}
 }

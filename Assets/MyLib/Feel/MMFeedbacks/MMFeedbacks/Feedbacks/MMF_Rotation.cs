@@ -1,7 +1,7 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
+using MoreMountains.Tools;
 using UnityEngine;
-using UnityEngine.Serialization;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
@@ -10,6 +10,7 @@ namespace MoreMountains.Feedbacks
 	/// </summary>
 	[AddComponentMenu("")]
 	[FeedbackHelp("This feedback will animate the target's rotation on the 3 specified animation curves (one per axis), for the specified duration (in seconds).")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
 	[FeedbackPath("Transform/Rotation")]
 	public class MMF_Rotation : MMF_Feedback
 	{
@@ -17,16 +18,20 @@ namespace MoreMountains.Feedbacks
 		public static bool FeedbackTypeAuthorized = true;
 		/// the possible modes for this feedback (Absolute : always follow the curve from start to finish, Additive : add to the values found when this feedback gets played)
 		public enum Modes { Absolute, Additive, ToDestination }
-		/// the timescale modes this feedback can operate on
-		public enum TimeScales { Scaled, Unscaled }
+		/// whether to animate the scale over time or at a fixed speed
+		public enum MovementModes { Duration, Speed }
 
 		/// sets the inspector color for this feedback
 		#if UNITY_EDITOR
 		public override Color FeedbackColor { get { return MMFeedbacksInspectorColors.TransformColor; } }
 		public override bool EvaluateRequiresSetup() { return (AnimateRotationTarget == null); }
 		public override string RequiredTargetText { get { return AnimateRotationTarget != null ? AnimateRotationTarget.name : "";  } }
-		public override string RequiresSetupText { get { return "This feedback requires that a AnimatePositionTarget and a Destination be set to be able to work properly. You can set one below."; } }
+		public override string RequiresSetupText { get { return "This feedback requires that you set an AnimateRotationTarget to be able to work properly. You can set one below."; } }
+		public override bool HasCustomInspectors { get { return true; } }
 		#endif
+		public override bool HasAutomatedTargetAcquisition => true;
+		public override bool CanForceInitialValue => true;
+		protected override void AutomateTargetAcquisition() => AnimateRotationTarget = FindAutomatedTarget<Transform>();
 
 		[MMFInspectorGroup("Rotation Target", true, 61, true)]
 		/// the object whose rotation you want to animate
@@ -40,9 +45,18 @@ namespace MoreMountains.Feedbacks
 		/// whether this feedback should play on local or world rotation
 		[Tooltip("whether this feedback should play on local or world rotation")]
 		public Space RotationSpace = Space.World;
+		/// whether movement should occur over a fixed duration, or at a certain speed. Note that speed mode will only apply in AtoB and ToDestination modes
+		[Tooltip("whether movement should occur over a fixed duration, or at a certain speed. Note that speed mode will only apply in AtoB and ToDestination modes")]
+		[MMFEnumCondition("Mode", (int)Modes.ToDestination)]
+		public MovementModes MovementMode = MovementModes.Duration;
 		/// the duration of the transition
 		[Tooltip("the duration of the transition")]
+		[MMFEnumCondition("MovementMode", (int)MovementModes.Duration)]
 		public float AnimateRotationDuration = 0.2f;
+		/// in speed mode, the speed at which we should animate the position
+		[Tooltip("in speed mode, the speed at which we should animate the position")]
+		[MMFEnumCondition("MovementMode", (int)MovementModes.Speed)]
+		public float AnimatePositionSpeed = 1f;
 		/// the value to remap the curve's 0 value to
 		[Tooltip("the value to remap the curve's 0 value to")]
 		[MMFEnumCondition("Mode", (int)Modes.Absolute, (int)Modes.Additive)]
@@ -55,26 +69,26 @@ namespace MoreMountains.Feedbacks
 		[Tooltip("if this is true, should animate the X rotation")]
 		[MMFEnumCondition("Mode", (int)Modes.Absolute, (int)Modes.Additive)]
 		public bool AnimateX = true;
+		
+		
 		/// how the x part of the rotation should animate over time, in degrees
 		[Tooltip("how the x part of the rotation should animate over time, in degrees")]
-		[MMFEnumCondition("Mode", (int)Modes.Absolute, (int)Modes.Additive)]
-		public AnimationCurve AnimateRotationX = new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.3f, 1f), new Keyframe(1, 0));
-		/// if this is true, should animate the X rotation
-		[Tooltip("if this is true, should animate the X rotation")]
+		public MMTweenType AnimateRotationTweenX = new MMTweenType( new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.3f, 1f), new Keyframe(1, 0)), "AnimateX");
+		/// if this is true, should animate the Y rotation
+		[Tooltip("if this is true, should animate the Y rotation")]
 		[MMFEnumCondition("Mode", (int)Modes.Absolute, (int)Modes.Additive)]
 		public bool AnimateY = true;
 		/// how the y part of the rotation should animate over time, in degrees
 		[Tooltip("how the y part of the rotation should animate over time, in degrees")]
-		[MMFEnumCondition("Mode", (int)Modes.Absolute, (int)Modes.Additive)]
-		public AnimationCurve AnimateRotationY = new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.3f, 1f), new Keyframe(1, 0));
-		/// if this is true, should animate the X rotation
-		[Tooltip("if this is true, should animate the X rotation")]
+		public MMTweenType AnimateRotationTweenY = new MMTweenType( new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.3f, 1f), new Keyframe(1, 0)), "AnimateY");
+		/// if this is true, should animate the Z rotation
+		[Tooltip("if this is true, should animate the Z rotation")]
 		[MMFEnumCondition("Mode", (int)Modes.Absolute, (int)Modes.Additive)]
 		public bool AnimateZ = true;
 		/// how the z part of the rotation should animate over time, in degrees
 		[Tooltip("how the z part of the rotation should animate over time, in degrees")]
-		[MMFEnumCondition("Mode", (int)Modes.Absolute, (int)Modes.Additive)]
-		public AnimationCurve AnimateRotationZ = new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.3f, 1f), new Keyframe(1, 0));
+		public MMTweenType AnimateRotationTweenZ = new MMTweenType( new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.3f, 1f), new Keyframe(1, 0)), "AnimateZ");
+		
 		/// if this is true, calling that feedback will trigger it, even if it's in progress. If it's false, it'll prevent any new Play until the current one is over
 		[Tooltip("if this is true, calling that feedback will trigger it, even if it's in progress. If it's false, it'll prevent any new Play until the current one is over")] 
 		public bool AllowAdditivePlays = false;
@@ -91,13 +105,26 @@ namespace MoreMountains.Feedbacks
 		[Tooltip("the angles to match when in ToDestination mode")]
 		[MMFEnumCondition("Mode", (int)Modes.ToDestination)]
 		public Vector3 DestinationAngles = new Vector3(0f, 180f, 0f);
-		/// the animation curve to use when animating to destination (individual x,y,z curves above won't be used)
-		[Tooltip("the animation curve to use when animating to destination (individual x,y,z curves above won't be used)")]
+		/// an optional transform we want to match the rotation of. if one is set, DestinationAngles will be ignored 
+		[Tooltip("an optional transform we want to match the rotation of. if one is set, DestinationAngles will be ignored")]
 		[MMFEnumCondition("Mode", (int)Modes.ToDestination)]
-		public AnimationCurve ToDestinationCurve = new AnimationCurve(new Keyframe(0, 0), new Keyframe(1, 1f));
-        
+		public Transform ToDestinationTransform;
+		/// how the x part of the rotation should animate over time, in degrees
+		[Tooltip("how the x part of the rotation should animate over time, in degrees")]
+		public MMTweenType ToDestinationTween = new MMTweenType(MMTween.MMTweenCurve.EaseInQuintic, "", "Mode", (int)Modes.ToDestination);
+		
 		/// the duration of this feedback is the duration of the rotation
 		public override float FeedbackDuration { get { return ApplyTimeMultiplier(AnimateRotationDuration); } set { AnimateRotationDuration = value; } }
+		public override bool HasRandomness => true;
+		
+		/// [DEPRECATED] how the x part of the rotation should animate over time, in degrees
+		[HideInInspector] public AnimationCurve AnimateRotationX = null;
+		/// [DEPRECATED] how the y part of the rotation should animate over time, in degrees
+		[HideInInspector] public AnimationCurve AnimateRotationY = null;
+		/// [DEPRECATED] how the z part of the rotation should animate over time, in degrees
+		[HideInInspector] public AnimationCurve AnimateRotationZ = null;
+		/// [DEPRECATED] the animation curve to use when animating to destination (individual x,y,z curves above won't be used)
+		[HideInInspector] public AnimationCurve ToDestinationCurve = null;
 
 		protected Quaternion _initialRotation;
 		protected Vector3 _initialToDestinationAngles;
@@ -125,6 +152,24 @@ namespace MoreMountains.Feedbacks
 			_initialRotation = (RotationSpace == Space.World) ? AnimateRotationTarget.rotation : AnimateRotationTarget.localRotation;
 			_initialToDestinationAngles = _initialRotation.eulerAngles;
 		}
+		
+		/// <summary>
+		/// In speed mode, computes the duration the feedback should last based on the distance between the two points and the speed
+		/// </summary>
+		/// <param name="pointA"></param>
+		/// <param name="pointB"></param>
+		/// <param name="duration"></param>
+		/// <returns></returns>
+		protected virtual float HandleSpeedMode(Quaternion pointA, Quaternion pointB, float duration)
+		{
+			if (MovementMode != MovementModes.Speed)
+			{
+				return duration;
+			}
+
+			float distance = 2 * Mathf.Acos(Quaternion.Dot(pointA, pointB));
+			return distance / AnimatePositionSpeed;
+		}
 
 		/// <summary>
 		/// On play, we trigger our rotation animation
@@ -138,7 +183,7 @@ namespace MoreMountains.Feedbacks
 				return;
 			}
             
-			float intensityMultiplier = Timing.ConstantIntensity ? 1f : feedbacksIntensity;
+			float intensityMultiplier = ComputeIntensity(feedbacksIntensity, position);
 			if (Active || Owner.AutoPlayOnEnable)
 			{
 				if ((Mode == Modes.Absolute) || (Mode == Modes.Additive))
@@ -149,7 +194,7 @@ namespace MoreMountains.Feedbacks
 					}
 					if (DetermineRotationOnPlay && NormalPlayDirection) { GetInitialRotation(); }
 					ClearCoroutine();
-					_coroutine = Owner.StartCoroutine(AnimateRotation(AnimateRotationTarget, Vector3.zero, FeedbackDuration, AnimateRotationX, AnimateRotationY, AnimateRotationZ, RemapCurveZero * intensityMultiplier, RemapCurveOne * intensityMultiplier));
+					_coroutine = Owner.StartCoroutine(AnimateRotation(AnimateRotationTarget, Vector3.zero, FeedbackDuration, AnimateRotationTweenX, AnimateRotationTweenY, AnimateRotationTweenZ, RemapCurveZero * intensityMultiplier, RemapCurveOne * intensityMultiplier));
 				}
 				else if (Mode == Modes.ToDestination)
 				{
@@ -184,7 +229,7 @@ namespace MoreMountains.Feedbacks
 				yield break;
 			}
 
-			if ((AnimateRotationX == null) || (AnimateRotationY == null) || (AnimateRotationZ == null))
+			if ((AnimateRotationTweenX == null) || (AnimateRotationTweenY == null) || (AnimateRotationTweenZ == null))
 			{
 				yield break;
 			}
@@ -194,7 +239,13 @@ namespace MoreMountains.Feedbacks
 				yield break;
 			}
 
-			Vector3 destinationAngles = NormalPlayDirection ? DestinationAngles : _initialToDestinationAngles;
+			Vector3 tempAngles = DestinationAngles;
+			if (ToDestinationTransform != null)
+			{
+				tempAngles = ToDestinationTransform.eulerAngles;
+			}
+			
+			Vector3 destinationAngles = NormalPlayDirection ? tempAngles : _initialToDestinationAngles;
 			float journey = NormalPlayDirection ? 0f : FeedbackDuration;
 
 			_initialRotation = AnimateRotationTarget.transform.rotation;
@@ -210,11 +261,13 @@ namespace MoreMountains.Feedbacks
 			_destinationRotation = AnimateRotationTarget.transform.rotation;
 			AnimateRotationTarget.transform.rotation = _initialRotation;
 			IsPlaying = true;
+			
+			float duration = HandleSpeedMode(_initialRotation, _destinationRotation, FeedbackDuration);
             
-			while ((journey >= 0) && (journey <= FeedbackDuration) && (FeedbackDuration > 0))
+			while ((journey >= 0) && (journey <= duration) && (duration > 0))
 			{
-				float percent = Mathf.Clamp01(journey / FeedbackDuration);
-				percent = ToDestinationCurve.Evaluate(percent);
+				float percent = Mathf.Clamp01(journey / duration);
+				percent = ToDestinationTween.Evaluate(percent);
 
 				Quaternion newRotation = Quaternion.LerpUnclamped(_initialRotation, _destinationRotation, percent);
 				AnimateRotationTarget.transform.rotation = newRotation;
@@ -251,9 +304,9 @@ namespace MoreMountains.Feedbacks
 		protected virtual IEnumerator AnimateRotation(Transform targetTransform,
 			Vector3 vector,
 			float duration,
-			AnimationCurve curveX,
-			AnimationCurve curveY,
-			AnimationCurve curveZ,
+			MMTweenType curveX,
+			MMTweenType curveY,
+			MMTweenType curveZ,
 			float remapZero,
 			float remapOne)
 		{
@@ -308,7 +361,7 @@ namespace MoreMountains.Feedbacks
 		/// <param name="curveY"></param>
 		/// <param name="curveZ"></param>
 		/// <param name="percent"></param> 
-		protected virtual void ApplyRotation(Transform targetTransform, float remapZero, float remapOne, AnimationCurve curveX, AnimationCurve curveY, AnimationCurve curveZ, float percent)
+		protected virtual void ApplyRotation(Transform targetTransform, float remapZero, float remapOne, MMTweenType curveX, MMTweenType curveY, MMTweenType curveZ, float percent)
 		{
 			if (RotationSpace == Space.World)
 			{
@@ -321,20 +374,17 @@ namespace MoreMountains.Feedbacks
 
 			if (AnimateX)
 			{
-				float x = curveX.Evaluate(percent);
-				x = MMFeedbacksHelpers.Remap(x, 0f, 1f, remapZero, remapOne);
+				float x = MMTween.Tween(percent, 0f, 1f, remapZero, remapOne, curveX);
 				targetTransform.Rotate(Vector3.right, x, RotationSpace);
 			}
 			if (AnimateY)
 			{
-				float y = curveY.Evaluate(percent);
-				y = MMFeedbacksHelpers.Remap(y, 0f, 1f, remapZero, remapOne);
+				float y = MMTween.Tween(percent, 0f, 1f, remapZero, remapOne, curveY);
 				targetTransform.Rotate(Vector3.up, y, RotationSpace);
 			}
 			if (AnimateZ)
 			{
-				float z = curveZ.Evaluate(percent);
-				z = MMFeedbacksHelpers.Remap(z, 0f, 1f, remapZero, remapOne);
+				float z = MMTween.Tween(percent, 0f, 1f, remapZero, remapOne, curveZ);
 				targetTransform.Rotate(Vector3.forward, z, RotationSpace);
 			}
 		}
@@ -360,6 +410,48 @@ namespace MoreMountains.Feedbacks
 		public override void OnDisable()
 		{
 			_coroutine = null;
+		}
+		
+		/// <summary>
+		/// On Validate, we migrate our deprecated animation curves to our tween types if needed
+		/// </summary>
+		public override void OnValidate()
+		{
+			base.OnValidate();
+			MMFeedbacksHelpers.MigrateCurve(AnimateRotationX, AnimateRotationTweenX, Owner);
+			MMFeedbacksHelpers.MigrateCurve(AnimateRotationY, AnimateRotationTweenY, Owner);
+			MMFeedbacksHelpers.MigrateCurve(AnimateRotationZ, AnimateRotationTweenZ, Owner);
+			MMFeedbacksHelpers.MigrateCurve(ToDestinationCurve, ToDestinationTween, Owner);
+			
+			if (string.IsNullOrEmpty(AnimateRotationTweenX.ConditionPropertyName))
+			{
+				AnimateRotationTweenX.ConditionPropertyName = "AnimateX";
+				AnimateRotationTweenY.ConditionPropertyName = "AnimateY";
+				AnimateRotationTweenZ.ConditionPropertyName = "AnimateZ";
+				ToDestinationTween.EnumConditionPropertyName = "Mode";
+				ToDestinationTween.EnumConditions = new bool[32];
+				ToDestinationTween.EnumConditions[(int)Modes.ToDestination] = true;
+			}
+		}
+		
+		/// <summary>
+		/// On restore, we restore our initial state
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+
+			if (RotationSpace == Space.World)
+			{
+				AnimateRotationTarget.rotation = _initialRotation;
+			}
+			else
+			{
+				AnimateRotationTarget.localRotation= _initialRotation;	
+			}
 		}
 	}
 }

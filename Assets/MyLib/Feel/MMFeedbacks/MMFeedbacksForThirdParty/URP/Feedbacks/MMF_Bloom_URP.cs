@@ -1,7 +1,9 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using MoreMountains.Feedbacks;
+using UnityEngine.Scripting.APIUpdating;
+#if MM_URP
+using UnityEngine.Rendering.Universal;
+#endif
 
 namespace MoreMountains.FeedbacksForThirdParty
 {
@@ -11,9 +13,10 @@ namespace MoreMountains.FeedbacksForThirdParty
 	[AddComponentMenu("")]
 	[FeedbackHelp("This feedback allows you to control bloom intensity and threshold over time. It requires you have in your scene an object with a Volume " +
 	              "with Bloom active, and a MMBloomShaker_URP component.")]
-    #if MM_URP
+	#if MM_URP
 	[FeedbackPath("PostProcess/Bloom URP")]
 	#endif
+	[MovedFrom(false, null, "MoreMountains.Feedbacks.URP")]
 	public class MMF_Bloom_URP : MMF_Feedback 
 	{
 		/// a static bool used to disable all feedbacks of this type at once
@@ -21,11 +24,14 @@ namespace MoreMountains.FeedbacksForThirdParty
 		/// sets the inspector color for this feedback
 		#if UNITY_EDITOR
 		public override Color FeedbackColor { get { return MMFeedbacksInspectorColors.PostProcessColor; } }
+		public override bool HasCustomInspectors => true;
+		public override bool HasAutomaticShakerSetup => true;
 		#endif
 
 		/// the duration of this feedback is the duration of the shake
 		public override float FeedbackDuration { get { return ApplyTimeMultiplier(ShakeDuration); }  set { ShakeDuration = value;  } }
 		public override bool HasChannel => true;
+		public override bool HasRandomness => true;
 
 		[MMFInspectorGroup("Bloom", true, 41)]
 		/// the duration of the feedback, in seconds
@@ -74,8 +80,11 @@ namespace MoreMountains.FeedbacksForThirdParty
 			{
 				return;
 			}
+
+			attenuation  = ComputeIntensity(attenuation, position);
+			
 			MMBloomShakeEvent_URP.Trigger(ShakeIntensity, FeedbackDuration, RemapIntensityZero, RemapIntensityOne, ShakeThreshold, RemapThresholdZero, RemapThresholdOne,
-				RelativeValues, attenuation, Channel, ResetShakerValuesAfterShake, ResetTargetValuesAfterShake, NormalPlayDirection, Timing.TimescaleMode);
+				RelativeValues, attenuation, ChannelData, ResetShakerValuesAfterShake, ResetTargetValuesAfterShake, NormalPlayDirection, ComputedTimescaleMode);
             
 		}
         
@@ -91,8 +100,33 @@ namespace MoreMountains.FeedbacksForThirdParty
 				return;
 			}
 			base.CustomStopFeedback(position, feedbacksIntensity);
-			MMBloomShakeEvent_URP.Trigger(ShakeIntensity, FeedbackDuration, RemapIntensityZero, RemapIntensityOne, ShakeThreshold, RemapThresholdZero, RemapThresholdOne,
-				RelativeValues, channel:Channel, stop: true);
+			MMBloomShakeEvent_URP.Trigger(ShakeIntensity, FeedbackDuration, RemapIntensityZero, RemapIntensityOne, 
+				ShakeThreshold, RemapThresholdZero, RemapThresholdOne,
+				RelativeValues, channelData:ChannelData, stop: true);
+		}
+
+		/// <summary>
+		/// On restore, we put our object back at its initial position
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+			MMBloomShakeEvent_URP.Trigger(ShakeIntensity, FeedbackDuration, RemapIntensityZero, RemapIntensityOne, 
+				ShakeThreshold, RemapThresholdZero, RemapThresholdOne,
+				RelativeValues, channelData:ChannelData, restore: true);
+		}
+		
+		/// <summary>
+		/// Automaticall sets up the post processing profile and shaker
+		/// </summary>
+		public override void AutomaticShakerSetup()
+		{
+			#if MM_URP && UNITY_EDITOR
+			MMURPHelpers.GetOrCreateVolume<Bloom, MMBloomShaker_URP>(Owner, "Bloom");
+			#endif
 		}
 	}
 }

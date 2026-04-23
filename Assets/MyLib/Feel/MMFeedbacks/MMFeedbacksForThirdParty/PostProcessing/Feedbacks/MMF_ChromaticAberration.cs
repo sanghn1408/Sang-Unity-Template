@@ -1,7 +1,9 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using MoreMountains.Feedbacks;
+#if MM_POSTPROCESSING
+using UnityEngine.Rendering.PostProcessing;
+#endif
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.FeedbacksForThirdParty
 {
@@ -13,6 +15,7 @@ namespace MoreMountains.FeedbacksForThirdParty
 	#if MM_POSTPROCESSING
 	[FeedbackPath("PostProcess/Chromatic Aberration")]
 	#endif
+	[MovedFrom(false, null, "MoreMountains.Feedbacks.PostProcessing")]
 	[FeedbackHelp("This feedback allows you to control chromatic aberration intensity over time. It requires you have in your scene an object with a PostProcessVolume " +
 	              "with Chromatic Aberration active, and a MMChromaticAberrationShaker component.")]
 	public class MMF_ChromaticAberration : MMF_Feedback
@@ -22,12 +25,15 @@ namespace MoreMountains.FeedbacksForThirdParty
 		/// sets the inspector color for this feedback
 		#if UNITY_EDITOR
 		public override Color FeedbackColor { get { return MMFeedbacksInspectorColors.PostProcessColor; } }
-		public override string RequiredTargetText { get { return "Channel "+Channel;  } }
+		public override string RequiredTargetText => RequiredChannelText;
+		public override bool HasCustomInspectors => true;
+		public override bool HasAutomaticShakerSetup => true;
 		#endif
 
 		/// the duration of this feedback is the duration of the shake
 		public override float FeedbackDuration { get { return ApplyTimeMultiplier(Duration); } set { Duration = value;  } }
 		public override bool HasChannel => true;
+		public override bool HasRandomness => true;
 
 		[MMFInspectorGroup("Chromatic Aberration", true, 44)]
 		/// the duration of the shake, in seconds
@@ -71,9 +77,9 @@ namespace MoreMountains.FeedbacksForThirdParty
 			{
 				return;
 			}
-			float intensityMultiplier = Timing.ConstantIntensity ? 1f : feedbacksIntensity;
+			float intensityMultiplier = ComputeIntensity(feedbacksIntensity, position);
 			MMChromaticAberrationShakeEvent.Trigger(Intensity, FeedbackDuration, RemapIntensityZero, RemapIntensityOne, RelativeIntensity, intensityMultiplier,
-				Channel, ResetShakerValuesAfterShake, ResetTargetValuesAfterShake, NormalPlayDirection, Timing.TimescaleMode);
+				ChannelData, ResetShakerValuesAfterShake, ResetTargetValuesAfterShake, NormalPlayDirection, ComputedTimescaleMode);
 		}
 
 		/// <summary>
@@ -89,6 +95,28 @@ namespace MoreMountains.FeedbacksForThirdParty
 			}
 			base.CustomStopFeedback(position, feedbacksIntensity);
 			MMChromaticAberrationShakeEvent.Trigger(Intensity, FeedbackDuration, RemapIntensityZero, RemapIntensityOne, RelativeIntensity, stop:true);
+		}
+
+		/// <summary>
+		/// On restore, we put our object back at its initial position
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+			MMChromaticAberrationShakeEvent.Trigger(Intensity, FeedbackDuration, RemapIntensityZero, RemapIntensityOne, RelativeIntensity, restore:true);
+		}
+		
+		/// <summary>
+		/// Automaticall sets up the post processing profile and shaker
+		/// </summary>
+		public override void AutomaticShakerSetup()
+		{
+			#if UNITY_EDITOR && MM_POSTPROCESSING
+			MMPostProcessingHelpers.GetOrCreateVolume<ChromaticAberration, MMChromaticAberrationShaker>(Owner, "Chromatic Aberration");
+			#endif
 		}
 	}
 }

@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
@@ -10,6 +11,7 @@ namespace MoreMountains.Feedbacks
 	/// </summary>
 	[AddComponentMenu("")]
 	[FeedbackHelp("This feedback allows you to set global properties on your shader, or enable/disable keywords.")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
 	[FeedbackPath("Renderer/Shader Global")]
 	public class MMF_ShaderGlobal : MMF_Feedback
 	{
@@ -63,6 +65,13 @@ namespace MoreMountains.Feedbacks
 		[Tooltip("a global shader keyword")] 
 		[MMFEnumCondition("Mode", (int)Modes.EnableKeyword, (int)Modes.DisableKeyword)]
 		public string Keyword;
+
+		protected Color _initialColor;
+		protected float _initialFloat;
+		protected int _initialInt;
+		protected Matrix4x4 _initialMatrix;
+		protected RenderTexture _initialTexture;
+		protected Vector4 _initialVector;
         
 		/// <summary>
 		/// On Play we set our global shader property
@@ -146,6 +155,80 @@ namespace MoreMountains.Feedbacks
 					break;
 				case Modes.WarmupAllShaders:
 					Shader.WarmupAllShaders();
+					break;
+			}
+		}
+		
+		/// <summary>
+		/// On restore, we restore our initial state
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+			switch (Mode)
+			{
+				case Modes.SetGlobalColor:
+					if (PropertyName == "")
+					{
+						Shader.SetGlobalColor(PropertyNameID, _initialColor);
+					}
+					else
+					{
+						Shader.SetGlobalColor(PropertyName, _initialColor);
+					}
+					break;
+				case Modes.SetGlobalFloat:
+					if (PropertyName == "")
+					{
+						Shader.SetGlobalFloat(PropertyNameID, _initialFloat);
+					}
+					else
+					{
+						Shader.SetGlobalFloat(PropertyName, _initialFloat);
+					}
+					break;
+				case Modes.SetGlobalInt:
+					if (PropertyName == "")
+					{
+						Shader.SetGlobalInt(PropertyNameID, _initialInt);
+					}
+					else
+					{
+						Shader.SetGlobalInt(PropertyName, _initialInt);
+					}
+					break;
+				case Modes.SetGlobalMatrix:
+					if (PropertyName == "")
+					{
+						Shader.SetGlobalMatrix(PropertyNameID, _initialMatrix);
+					}
+					else
+					{
+						Shader.SetGlobalMatrix(PropertyName, _initialMatrix);
+					}
+					break;
+				case Modes.SetGlobalTexture:
+					if (PropertyName == "")
+					{
+						Shader.SetGlobalTexture(PropertyNameID, _initialTexture);
+					}
+					else
+					{
+						Shader.SetGlobalTexture(PropertyName, _initialTexture);
+					}
+					break;
+				case Modes.SetGlobalVector:
+					if (PropertyName == "")
+					{
+						Shader.SetGlobalVector(PropertyNameID, _initialVector);
+					}
+					else
+					{
+						Shader.SetGlobalVector(PropertyName, _initialVector);
+					}
 					break;
 			}
 		}

@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
 using MoreMountains.Feedbacks;
+using MoreMountains.Tools;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.FeedbacksForThirdParty
 {
@@ -12,15 +14,18 @@ namespace MoreMountains.FeedbacksForThirdParty
 	#if MM_POSTPROCESSING
 	[FeedbackPath("PostProcess/Global PP Volume Auto Blend")]
 	#endif
+	[MovedFrom(false, null, "MoreMountains.Feedbacks.PostProcessing")]
 	public class MMF_GlobalPPVolumeAutoBlend : MMF_Feedback
 	{
 		/// sets the inspector color for this feedback
 		#if UNITY_EDITOR
 		public override Color FeedbackColor { get { return MMFeedbacksInspectorColors.PostProcessColor; } }
-		public override bool EvaluateRequiresSetup() { return (TargetAutoBlend == null); }
 		public override string RequiredTargetText { get { return TargetAutoBlend != null ? TargetAutoBlend.name : "";  } }
 		public override string RequiresSetupText { get { return "This feedback requires that a TargetAutoBlend be set to be able to work properly. You can set one below."; } }
 		#endif
+		public override bool HasAutomatedTargetAcquisition => true;
+		protected override void AutomateTargetAcquisition() => TargetAutoBlend = FindAutomatedTarget<MMGlobalPostProcessingVolumeAutoBlend>();
+		public override bool HasChannel => true;
         
 		/// a static bool used to disable all feedbacks of this type at once
 		public static bool FeedbackTypeAuthorized = true;
@@ -37,7 +42,7 @@ namespace MoreMountains.FeedbacksForThirdParty
 			{
 				if (Mode == Modes.Override)
 				{
-					return BlendDuration;
+					return ApplyTimeMultiplier(BlendDuration);
 				}
 				else
 				{
@@ -47,7 +52,7 @@ namespace MoreMountains.FeedbacksForThirdParty
 					}
 					else
 					{
-						return TargetAutoBlend.BlendDuration;
+						return ApplyTimeMultiplier(TargetAutoBlend.BlendDuration);
 					}
 				}
 			}
@@ -98,58 +103,8 @@ namespace MoreMountains.FeedbacksForThirdParty
 				return;
 			}
 			#if MM_POSTPROCESSING
-            
-			if (TargetAutoBlend == null)
-			{
-				Debug.LogWarning(Owner.name + " : this MMFeedbackGlobalPPVolumeAutoBlend needs a TargetAutoBlend, please set one in its inspector.");
-				return;
-			}
-			if (Mode == Modes.Default)
-			{
-				if (!NormalPlayDirection)
-				{
-					if (BlendAction == Actions.Blend)
-					{
-						TargetAutoBlend.BlendBack();
-						return;
-					}
-					if (BlendAction == Actions.BlendBack)
-					{
-						TargetAutoBlend.Blend();
-						return;
-					}
-				}
-				else
-				{
-					if (BlendAction == Actions.Blend)
-					{
-						TargetAutoBlend.Blend();
-						return;
-					}
-					if (BlendAction == Actions.BlendBack)
-					{
-						TargetAutoBlend.BlendBack();
-						return;
-					}    
-				}
-			}
-			else
-			{
-				TargetAutoBlend.BlendDuration = BlendDuration;
-				TargetAutoBlend.Curve = BlendCurve;
-				if (!NormalPlayDirection)
-				{
-					TargetAutoBlend.InitialWeight = FinalWeight;
-					TargetAutoBlend.FinalWeight = InitialWeight;   
-				}
-				else
-				{
-					TargetAutoBlend.InitialWeight = InitialWeight;
-					TargetAutoBlend.FinalWeight = FinalWeight;    
-				}
-				TargetAutoBlend.ResetToInitialValueOnEnd = ResetToInitialValueOnEnd;
-				TargetAutoBlend.Blend();
-			}
+			MMGlobalPostProcessingVolumeAutoBlend.TimeScales timeScale = (ComputedTimescaleMode == TimescaleModes.Scaled) ? MMGlobalPostProcessingVolumeAutoBlend.TimeScales.Scaled : MMGlobalPostProcessingVolumeAutoBlend.TimeScales.Unscaled;
+			MMPostProcessingVolumeAutoBlendShakeEvent.Trigger(ChannelData, TargetAutoBlend, Mode, BlendAction, ApplyTimeMultiplier(BlendDuration), BlendCurve, InitialWeight, FinalWeight, ResetToInitialValueOnEnd, NormalPlayDirection, timeScale);
 			#endif
 		}
 
@@ -171,6 +126,21 @@ namespace MoreMountains.FeedbacksForThirdParty
 			{
 				TargetAutoBlend.StopBlending();
 			}
+			#endif
+		}
+
+		/// <summary>
+		/// On restore, we put our object back at its initial position
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+
+			#if UNITY_EDITOR && MM_POSTPROCESSING
+			TargetAutoBlend.RestoreInitialValues();
 			#endif
 		}
 	}

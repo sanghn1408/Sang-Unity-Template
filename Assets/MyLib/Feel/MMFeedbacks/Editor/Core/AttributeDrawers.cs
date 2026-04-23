@@ -1,7 +1,5 @@
-﻿using UnityEngine;
-using UnityEngine.UI;
-using System.Collections;
-using System;
+﻿using MoreMountains.Tools;
+using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -55,12 +53,12 @@ namespace MoreMountains.Feedbacks
 			}
 			else
 			{
-				int multiplier = 1; // this multiplier fixes issues in differing property spacing between MMFeedbacks and MMF_Player
+				/*int multiplier = 1; // this multiplier fixes issues in differing property spacing between MMFeedbacks and MMF_Player
 				if (property.depth > 0)
 				{
 					multiplier = property.depth;
-				}
-				return -EditorGUIUtility.standardVerticalSpacing * multiplier;
+				}*/
+				return -EditorGUIUtility.standardVerticalSpacing /** multiplier*/;
 			}
 		}
 	}
@@ -74,19 +72,19 @@ namespace MoreMountains.Feedbacks
 			MMFConditionAttribute conditionAttribute = (MMFConditionAttribute)attribute;
 			bool enabled = GetConditionAttributeResult(conditionAttribute, property);
 			bool previouslyEnabled = GUI.enabled;
-			GUI.enabled = enabled;
-			if (!conditionAttribute.Hidden || enabled)
+			GUI.enabled = conditionAttribute.Negative ? !enabled : enabled;
+			if (ShouldDisplay(conditionAttribute, enabled))
 			{
 				EditorGUI.PropertyField(position, property, label, true);
 			}
 			GUI.enabled = previouslyEnabled;
 		}
 
-		private bool GetConditionAttributeResult(MMFConditionAttribute condHAtt, SerializedProperty property)
+		private bool GetConditionAttributeResult(MMFConditionAttribute conditionAttribute, SerializedProperty property)
 		{
 			bool enabled = true;
 			string propertyPath = property.propertyPath;
-			string conditionPath = propertyPath.Replace(property.name, condHAtt.ConditionBoolean);
+			string conditionPath = propertyPath.Replace(property.name, conditionAttribute.ConditionBoolean);
 			SerializedProperty sourcePropertyValue = property.serializedObject.FindProperty(conditionPath);
 
 			if (sourcePropertyValue != null)
@@ -95,10 +93,20 @@ namespace MoreMountains.Feedbacks
 			}
 			else
 			{
-				Debug.LogWarning("No matching boolean found for ConditionAttribute in object: " + condHAtt.ConditionBoolean);
+				Debug.LogWarning("No matching boolean found for ConditionAttribute in object: " + conditionAttribute.ConditionBoolean);
 			}
 
 			return enabled;
+		}
+		
+		private bool ShouldDisplay(MMFConditionAttribute conditionAttribute, bool result)
+		{
+			bool shouldDisplay = !conditionAttribute.Hidden || result;
+			if (conditionAttribute.Negative)
+			{
+				shouldDisplay = !shouldDisplay;
+			}
+			return shouldDisplay;
 		}
 
 		public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
@@ -106,18 +114,18 @@ namespace MoreMountains.Feedbacks
 			MMFConditionAttribute conditionAttribute = (MMFConditionAttribute)attribute;
 			bool enabled = GetConditionAttributeResult(conditionAttribute, property);
 
-			if (!conditionAttribute.Hidden || enabled)
+			if (ShouldDisplay(conditionAttribute, enabled))
 			{
 				return EditorGUI.GetPropertyHeight(property, label);
 			}
 			else
 			{
-				int multiplier = 1; // this multiplier fixes issues in differing property spacing between MMFeedbacks and MMF_Player
+				/*int multiplier = 1; // this multiplier fixes issues in differing property spacing between MMFeedbacks and MMF_Player
 				if (property.depth > 0)
 				{
-					multiplier = property.depth;
-				}
-				return -EditorGUIUtility.standardVerticalSpacing * multiplier;
+					//multiplier = property.depth;
+				}*/
+				return -EditorGUIUtility.standardVerticalSpacing /** multiplier*/; 
 			}
 		}
 	}
@@ -157,7 +165,7 @@ namespace MoreMountains.Feedbacks
 		/// <param name="label">Label.</param>
 		public override void OnGUI(Rect rect, SerializedProperty prop, GUIContent label)
 		{
-			if (HelpEnabled())
+			if (MMMenuHelp.HelpEnabled)
 			{
 				EditorStyles.helpBox.richText = true;
 				Rect helpPosition = rect;
@@ -200,7 +208,7 @@ namespace MoreMountains.Feedbacks
 		/// <param name="label">Label.</param>
 		public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
 		{
-			if (HelpEnabled())
+			if (MMMenuHelp.HelpEnabled)
 			{
 				return EditorGUI.GetPropertyHeight(property) + DetermineTextboxHeight(informationAttribute.Message) + spaceAfterTheTextBox + spaceBeforeTheTextBox;
 			}
@@ -208,23 +216,6 @@ namespace MoreMountains.Feedbacks
 			{
 				return EditorGUI.GetPropertyHeight(property);
 			}
-		}
-
-		/// <summary>
-		/// Checks the editor prefs to see if help is enabled or not
-		/// </summary>
-		/// <returns><c>true</c>, if enabled was helped, <c>false</c> otherwise.</returns>
-		protected virtual bool HelpEnabled()
-		{
-			bool helpEnabled = false;
-			if (EditorPrefs.HasKey("MMShowHelpInInspectors"))
-			{
-				if (EditorPrefs.GetBool("MMShowHelpInInspectors"))
-				{
-					helpEnabled = true;
-				}
-			}
-			return helpEnabled;
 		}
 
 		/// <summary>

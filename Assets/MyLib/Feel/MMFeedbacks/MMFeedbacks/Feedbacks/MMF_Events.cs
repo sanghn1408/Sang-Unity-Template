@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
@@ -10,7 +11,8 @@ namespace MoreMountains.Feedbacks
 	/// </summary>
 	[AddComponentMenu("")]
 	[FeedbackHelp("This feedback allows you to bind any type of Unity events to this feebdack's Play, Stop, Initialization and Reset methods.")]
-	[FeedbackPath("Events/Events")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
+	[FeedbackPath("Events/Unity Events")]
 	public class MMF_Events : MMF_Feedback
 	{
 		/// a static bool used to disable all feedbacks of this type at once

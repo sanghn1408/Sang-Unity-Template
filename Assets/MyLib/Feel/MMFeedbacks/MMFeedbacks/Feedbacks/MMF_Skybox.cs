@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
@@ -9,6 +10,7 @@ namespace MoreMountains.Feedbacks
 	/// </summary>
 	[AddComponentMenu("")]
 	[FeedbackHelp("This feedback will let you change the scene's skybox on play, replacing it with another one, either a specific one, or one picked at random among multiple skyboxes.")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
 	[FeedbackPath("Renderer/Skybox")]
 	public class MMF_Skybox : MMF_Feedback
 	{
@@ -29,6 +31,8 @@ namespace MoreMountains.Feedbacks
 		public Material SingleSkybox;
 		/// the skyboxes to pick from when in Random mode
 		public Material[] RandomSkyboxes;
+
+		protected Material _initialSkybox;
         
 		/// <summary>
 		/// On play, we set the scene's skybox to a new one
@@ -41,6 +45,8 @@ namespace MoreMountains.Feedbacks
 			{
 				return;
 			}
+
+			_initialSkybox = RenderSettings.skybox;
             
 			if (Mode == Modes.Single)
 			{
@@ -50,6 +56,19 @@ namespace MoreMountains.Feedbacks
 			{
 				RenderSettings.skybox = RandomSkyboxes[Random.Range(0, RandomSkyboxes.Length)];
 			}
+		}
+		
+		/// <summary>
+		/// On restore, we put our object back at its initial position
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+
+			RenderSettings.skybox = _initialSkybox;
 		}
 	}    
 }

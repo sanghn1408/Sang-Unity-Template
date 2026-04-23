@@ -1,6 +1,7 @@
 ﻿using MoreMountains.Tools;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
@@ -13,33 +14,41 @@ namespace MoreMountains.Feedbacks
 	[FeedbackHelp("This feedback will let you target (almost) any property, on any object in your scene. " +
 	              "It also works on scriptable objects. Drag an object, select a property, and setup your feedback " +
 	              "to update that property over time.")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks.MMTools")]
 	[FeedbackPath("GameObject/Property")]
 	public class MMF_Property : MMF_Feedback
 	{
+		/// a static bool used to disable all feedbacks of this type at once
+		public static bool FeedbackTypeAuthorized = true;
 		/// the duration of this feedback is the duration of the target property, or 0 if instant
 		public override float FeedbackDuration { get { return (Mode == Modes.Instant) ? 0f : ApplyTimeMultiplier(Duration); } set { if (Mode != Modes.Instant) { Duration = value; } } }
 		/// sets the inspector color for this feedback
 		#if UNITY_EDITOR
 		public override Color FeedbackColor { get { return MMFeedbacksInspectorColors.GameObjectColor; } }
 		public override bool EvaluateRequiresSetup() { return (Target == null); }
+		public override string RequiredTargetText { get { return Target != null ? Target.TargetObject.name+" - "+Target.TargetPropertyName : "";  } }
 		public override string RequiresSetupText { get { return "This feedback requires that a Target be set to be able to work properly. You can set one below."; } }
 		#endif
+		public override bool HasRandomness => true;
+		public override bool CanForceInitialValue => true;
+		public override bool ForceInitialValueDelayed => true;
+		public override bool HasCustomInspectors => true;
         
 		/// the possible modes for this feedback
-		public enum Modes { OverTime, Instant } 
+		public enum Modes { OverTime, Instant, ToDestination } 
         
-		[Header("Target Property")]
+		[MMFInspectorGroup("Target Property", true, 12)]
 		/// the receiver to write the level to
 		[Tooltip("the receiver to write the level to")]
 		public MMPropertyReceiver Target;
 
-		[Header("Mode")]
+		[MMFInspectorGroup("Mode", true, 29)]
 		/// whether the feedback should affect the target property instantly or over a period of time
 		[Tooltip("whether the feedback should affect the target property instantly or over a period of time")]
 		public Modes Mode = Modes.OverTime;
 		/// how long the target property should change over time
 		[Tooltip("how long the target property should change over time")]
-		[MMFEnumCondition("Mode", (int)Modes.OverTime)]
+		[MMFEnumCondition("Mode", (int)Modes.OverTime, (int)Modes.ToDestination)]
 		public float Duration = 0.2f;
 		/// whether or not that target property should be turned off on start
 		[Tooltip("whether or not that target property should be turned off on start")]
@@ -50,12 +59,14 @@ namespace MoreMountains.Feedbacks
 		/// if this is true, calling that feedback will trigger it, even if it's in progress. If it's false, it'll prevent any new Play until the current one is over
 		[Tooltip("if this is true, calling that feedback will trigger it, even if it's in progress. If it's false, it'll prevent any new Play until the current one is over")] 
 		public bool AllowAdditivePlays = false;
+		/// if this is true, initial value will be computed for every play, otherwise only once, on initialization
+		[Tooltip("if this is true, initial value will be computed for every play, otherwise only once, on initialization")]
+		public bool DetermineInitialValueOnPlay = false;
 
-		[Header("Level")]
+		[MMFInspectorGroup("Level", true, 30)]
 		/// the curve to tween the intensity on
 		[Tooltip("the curve to tween the intensity on")]
-		[MMFEnumCondition("Mode", (int)Modes.OverTime)]
-		public MMTweenType LevelCurve = new MMTweenType(new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.3f, 1f), new Keyframe(1, 0)));
+		public MMTweenType LevelCurve = new MMTweenType(new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.3f, 1f), new Keyframe(1, 0)), "", "Mode", (int)Modes.OverTime, (int)Modes.ToDestination);
 		/// the value to remap the intensity curve's 0 to
 		[Tooltip("the value to remap the intensity curve's 0 to")]
 		[MMFEnumCondition("Mode", (int)Modes.OverTime)]
@@ -68,6 +79,10 @@ namespace MoreMountains.Feedbacks
 		[Tooltip("the value to move the intensity to in instant mode")]
 		[MMFEnumCondition("Mode", (int)Modes.Instant)]
 		public float InstantLevel;
+		/// the value towards which to animate when in ToDestination mode
+		[Tooltip("the value towards which to animate when in ToDestination mode")]
+		[MMFEnumCondition("Mode", (int)Modes.ToDestination)]
+		public float ToDestinationLevel = 5f;
 
 		protected float _initialIntensity;
 		protected Coroutine _coroutine; 
@@ -79,9 +94,15 @@ namespace MoreMountains.Feedbacks
 		protected override void CustomInitialization(MMF_Player owner)
 		{
 			base.CustomInitialization(owner);
+			
+			if (Target == null)
+			{
+				Debug.LogWarning("[Property Feedback] The property feedback on "+Owner.name+" doesn't have a Target, it won't work. You need to specify one in its inspector.");
+				return;
+			}
 
 			Target.Initialization(Owner.gameObject);
-			_initialIntensity = Target.Level; 
+			GetInitialIntensity(); 
             
 			if (Active)
 			{
@@ -90,7 +111,14 @@ namespace MoreMountains.Feedbacks
 					Turn(false);
 				}
 			}
+		}
 
+		/// <summary>
+		/// Stores the current level of the target
+		/// </summary>
+		protected virtual void GetInitialIntensity()
+		{
+			_initialIntensity = Target.GetLevel();
 		}
 
 		/// <summary>
@@ -100,28 +128,76 @@ namespace MoreMountains.Feedbacks
 		/// <param name="feedbacksIntensity"></param>
 		protected override void CustomPlayFeedback(Vector3 position, float feedbacksIntensity = 1.0f)
 		{
-			if (Active)
+			if (!Active || !FeedbackTypeAuthorized || (Target == null))
 			{
-				Turn(true);
-                
-				float intensityMultiplier = Timing.ConstantIntensity ? 1f : feedbacksIntensity;
-                
-				switch (Mode)
-				{
-					case Modes.Instant:
-						Target.SetLevel(InstantLevel);
-						break;
-					case Modes.OverTime:
-						if (!AllowAdditivePlays && (_coroutine != null))
-						{
-							return;
-						}
-						_coroutine = Owner.StartCoroutine(UpdateValueSequence(intensityMultiplier));
-						break;
-				}
+				return;
+			}
+
+			if (DetermineInitialValueOnPlay)
+			{
+				GetInitialIntensity();
+			}
+			
+			Turn(true);
+            
+			float intensityMultiplier = ComputeIntensity(feedbacksIntensity, position);
+            
+			switch (Mode)
+			{
+				case Modes.Instant:
+					float newLevel = NormalPlayDirection ? InstantLevel : _initialIntensity;
+					Target.SetLevel(newLevel);
+					break;
+				case Modes.OverTime:
+					if (!AllowAdditivePlays && (_coroutine != null))
+					{
+						return;
+					}
+					if (_coroutine != null) { Owner.StopCoroutine(_coroutine); }
+					_coroutine = Owner.StartCoroutine(UpdateValueSequence(intensityMultiplier));
+					break;
+				case Modes.ToDestination:
+					if (_coroutine != null) { Owner.StopCoroutine(_coroutine); }
+					_coroutine = Owner.StartCoroutine(ToDestinationSequence(intensityMultiplier));
+					break;
 			}
 		}
 
+		/// <summary>
+		/// This coroutine will animate the target property's value towards the defined ToDestinationLevel.
+		/// Note that in RelativeValue mode, this ToDestinationLevel will be added to the initial value
+		/// </summary>
+		/// <param name="intensityMultiplier"></param>
+		protected virtual IEnumerator ToDestinationSequence(float intensityMultiplier)
+		{
+			float journey = NormalPlayDirection ? 0f : FeedbackDuration;
+			float initialValue = Target.GetLevel();
+			float destinationValue = ToDestinationLevel;
+
+			if (RelativeValues)
+			{
+				destinationValue += _initialIntensity;
+			}
+
+			while ((journey >= 0) && (journey <= FeedbackDuration) && (FeedbackDuration > 0))
+			{
+				float remappedTime = MMFeedbacksHelpers.Remap(journey, 0f, FeedbackDuration, 0f, 1f);
+
+				SetValues(remappedTime, intensityMultiplier, initialValue, destinationValue, false);
+
+				journey += NormalPlayDirection ? FeedbackDeltaTime : -FeedbackDeltaTime;
+				yield return null;
+			}
+			SetValues(FinalNormalizedTime, intensityMultiplier, initialValue, destinationValue, false);
+			if (StartsOff)
+			{
+				Turn(false);
+			}
+
+			_coroutine = null;
+			yield return null;
+		}
+		
 		/// <summary>
 		/// This coroutine will modify the values on the target property
 		/// </summary>
@@ -134,12 +210,12 @@ namespace MoreMountains.Feedbacks
 			{
 				float remappedTime = MMFeedbacksHelpers.Remap(journey, 0f, FeedbackDuration, 0f, 1f);
 
-				SetValues(remappedTime, intensityMultiplier);
+				SetValues(remappedTime, intensityMultiplier, RemapLevelZero, RemapLevelOne, true);
 
 				journey += NormalPlayDirection ? FeedbackDeltaTime : -FeedbackDeltaTime;
 				yield return null;
 			}
-			SetValues(FinalNormalizedTime, intensityMultiplier);
+			SetValues(FinalNormalizedTime, intensityMultiplier, RemapLevelZero, RemapLevelOne, true);
 			if (StartsOff)
 			{
 				Turn(false);
@@ -153,13 +229,13 @@ namespace MoreMountains.Feedbacks
 		/// Sets the various values on the target property on a specified time (between 0 and 1)
 		/// </summary>
 		/// <param name="time"></param>
-		protected virtual void SetValues(float time, float intensityMultiplier)
+		protected virtual void SetValues(float time, float intensityMultiplier, float remapZero, float remapOne, bool applyRelative)
 		{
-			float intensity = MMTween.Tween(time, 0f, 1f, RemapLevelZero, RemapLevelOne, LevelCurve);
+			float intensity = MMTween.Tween(time, 0f, 1f, remapZero, remapOne, LevelCurve);
 
 			intensity *= intensityMultiplier;
             
-			if (RelativeValues)
+			if (applyRelative && RelativeValues)
 			{
 				intensity += _initialIntensity;
 			}
@@ -181,7 +257,7 @@ namespace MoreMountains.Feedbacks
 				{
 					Owner.StopCoroutine(_coroutine);
 					_coroutine = null;
-					SetValues(_initialIntensity, 1f);
+					Target.SetLevel(_initialIntensity);
 				}
 
 				if (StartsOff)
@@ -200,6 +276,39 @@ namespace MoreMountains.Feedbacks
 			if (Target.TargetComponent.gameObject != null)
 			{
 				Target.TargetComponent.gameObject.SetActive(status);
+			}
+		}
+		
+		/// <summary>
+		/// On restore, we put our object back at its initial position
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+
+			if (StartsOff)
+			{
+				Turn(false);
+			}
+			
+			Target.SetLevel(_initialIntensity);
+		}
+		
+		/// <summary>
+		/// On Validate, we init our curves conditions if needed
+		/// </summary>
+		public override void OnValidate()
+		{
+			base.OnValidate();
+			if (string.IsNullOrEmpty(LevelCurve.EnumConditionPropertyName))
+			{
+				LevelCurve.EnumConditionPropertyName = "Mode";
+				LevelCurve.EnumConditions = new bool[32];
+				LevelCurve.EnumConditions[(int)Modes.OverTime] = true;
+				LevelCurve.EnumConditions[(int)Modes.ToDestination] = true;
 			}
 		}
 	}

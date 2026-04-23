@@ -44,7 +44,7 @@ public class RagdollHelper : MonoBehaviour
         for (int i = 0; i < _rigidbodys.Length; i++)
         {
             _rigidbodys[i].isKinematic = !b;
-            _rigidbodys[i].velocity = Vector3.zero;
+            _rigidbodys[i].linearVelocity = Vector3.zero;
         }
 
         for (int i = 0; i < _colliders.Length; i++)

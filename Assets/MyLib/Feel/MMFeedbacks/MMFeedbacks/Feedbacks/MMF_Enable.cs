@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
@@ -10,6 +11,7 @@ namespace MoreMountains.Feedbacks
 	[AddComponentMenu("")]
 	[FeedbackHelp("This feedback allows you to change the state of a behaviour on a target gameobject from active to inactive (or the opposite), on init, play, stop or reset. " +
 	              "For each of these you can specify if you want to force a state (enabled or disabled), or toggle it (enabled becomes disabled, disabled becomes enabled).")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
 	[FeedbackPath("GameObject/Enable Behaviour")]
 	public class MMF_Enable : MMF_Feedback
 	{
@@ -30,6 +32,9 @@ namespace MoreMountains.Feedbacks
 		/// the gameobject we want to change the active state of
 		[Tooltip("the gameobject we want to change the active state of")]
 		public Behaviour TargetBehaviour;
+		/// a list of extra gameobjects we want to change the active state of
+		[Tooltip("a list of extra gameobjects we want to change the active state of")]
+		public List<Behaviour> ExtraTargetBehaviours;
 		/// whether or not we should alter the state of the target object on init
 		[Tooltip("whether or not we should alter the state of the target object on init")]
 		public bool SetStateOnInit = false;
@@ -59,6 +64,8 @@ namespace MoreMountains.Feedbacks
 		[MMFCondition("SetStateOnReset", true)]
 		public PossibleStates StateOnReset = PossibleStates.Disabled;
 
+		protected bool _initialState;
+		
 		/// <summary>
 		/// On init we change the state of our Behaviour if needed
 		/// </summary>
@@ -140,17 +147,49 @@ namespace MoreMountains.Feedbacks
 		/// <param name="state"></param>
 		protected virtual void SetStatus(PossibleStates state)
 		{
+			SetStatus(state, TargetBehaviour);
+			foreach (Behaviour extra in ExtraTargetBehaviours)
+			{
+				SetStatus(state, extra);
+			}
+		}
+
+		/// <summary>
+		/// Sets the specified status on the target Behaviour
+		/// </summary>
+		/// <param name="state"></param>
+		/// <param name="target"></param>
+		protected virtual void SetStatus(PossibleStates state, Behaviour target)
+		{
+			_initialState = target.enabled;
 			switch (state)
 			{
 				case PossibleStates.Enabled:
-					TargetBehaviour.enabled = NormalPlayDirection ? true : false;
+					target.enabled = NormalPlayDirection ? true : false;
 					break;
 				case PossibleStates.Disabled:
-					TargetBehaviour.enabled = NormalPlayDirection ? false : true;
+					target.enabled = NormalPlayDirection ? false : true;
 					break;
 				case PossibleStates.Toggle:
-					TargetBehaviour.enabled = !TargetBehaviour.enabled;
+					target.enabled = !target.enabled;
 					break;
+			}
+		}
+		
+		/// <summary>
+		/// On restore, we put our object back at its initial position
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+			
+			TargetBehaviour.enabled = _initialState;
+			foreach (Behaviour extra in ExtraTargetBehaviours)
+			{
+				extra.enabled = _initialState;
 			}
 		}
 	}

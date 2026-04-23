@@ -1,6 +1,8 @@
 ﻿using UnityEngine;
 using System.Collections;
+#if MM_UI
 using UnityEngine.UI;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
@@ -9,6 +11,7 @@ namespace MoreMountains.Feedbacks
 	/// </summary>
 	[AddComponentMenu("")]
 	[FeedbackHelp("This feedback lets you control the contents of a target Text over time.")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
 	[FeedbackPath("UI/Text")]
 	public class MMF_Text : MMF_Feedback
 	{
@@ -23,6 +26,8 @@ namespace MoreMountains.Feedbacks
 		public override string RequiredTargetText { get { return TargetText != null ? TargetText.name : "";  } }
 		public override string RequiresSetupText { get { return "This feedback requires that a TargetText be set to be able to work properly. You can set one below."; } }
 		#endif
+		public override bool HasAutomatedTargetAcquisition => true;
+		protected override void AutomateTargetAcquisition() => TargetText = FindAutomatedTarget<Text>();
 
 		[MMFInspectorGroup("Text", true, 76, true)]
 		/// the Text component to control
@@ -32,6 +37,8 @@ namespace MoreMountains.Feedbacks
 		[Tooltip("the new text to replace the old one with")]
 		[TextArea]
 		public string NewText = "Hello World";
+
+		protected string _initialText;
 
 		/// <summary>
 		/// On play we change the text of our target TMPText
@@ -50,7 +57,21 @@ namespace MoreMountains.Feedbacks
 				return;
 			}
 
+			_initialText = TargetText.text;
 			TargetText.text = NewText;
+		}
+
+		/// <summary>
+		/// On restore, we put our object back at its initial position
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+			TargetText.text = _initialText;
 		}
 	}
 }
+#endif

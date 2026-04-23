@@ -1,7 +1,6 @@
-﻿using System.Collections.Generic;
-using UnityEngine;
-using MoreMountains.Feedbacks;
+﻿using UnityEngine;
 using System;
+using MoreMountains.Tools;
 
 namespace MoreMountains.Feedbacks
 {
@@ -33,78 +32,71 @@ namespace MoreMountains.Feedbacks
 
 	public struct MMCameraZoomEvent
 	{
-		public delegate void Delegate(MMCameraZoomModes mode, float newFieldOfView, float transitionDuration, float duration, int channel, bool useUnscaledTime = false, bool stop = false, bool relative = false);
-        
 		static private event Delegate OnEvent;
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)] private static void RuntimeInitialization() { OnEvent = null; }
+		static public void Register(Delegate callback) { OnEvent += callback; }
+		static public void Unregister(Delegate callback) { OnEvent -= callback; }
 
-		static public void Register(Delegate callback)
-		{
-			OnEvent += callback;
-		}
+		public delegate void Delegate(MMCameraZoomModes mode, float newFieldOfView, float transitionDuration, float duration, MMChannelData channelData, bool useUnscaledTime = false, bool stop = false, bool relative = false, bool restore = false, MMTweenType tweenType = null);
 
-		static public void Unregister(Delegate callback)
+		static public void Trigger(MMCameraZoomModes mode, float newFieldOfView, float transitionDuration, float duration, MMChannelData channelData, bool useUnscaledTime = false, bool stop = false, bool relative = false, bool restore = false, MMTweenType tweenType = null)
 		{
-			OnEvent -= callback;
-		}
-
-		static public void Trigger(MMCameraZoomModes mode, float newFieldOfView, float transitionDuration, float duration, int channel, bool useUnscaledTime = false, bool stop = false, bool relative = false)
-		{
-			OnEvent?.Invoke(mode, newFieldOfView, transitionDuration, duration, channel, useUnscaledTime, stop, relative);
+			OnEvent?.Invoke(mode, newFieldOfView, transitionDuration, duration, channelData, useUnscaledTime, stop, relative, restore, tweenType);
 		}
 	}
 
 	public struct MMCameraShakeEvent
 	{
-		public delegate void Delegate(float duration, float amplitude, float frequency, float amplitudeX, float amplitudeY, float amplitudeZ, bool infinite = false, int channel = 0, bool useUnscaledTime = false);
 		static private event Delegate OnEvent;
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)] private static void RuntimeInitialization() { OnEvent = null; }
+		static public void Register(Delegate callback) { OnEvent += callback; }
+		static public void Unregister(Delegate callback) { OnEvent -= callback; }
 
-		static public void Register(Delegate callback)
-		{
-			OnEvent += callback;
-		}
+		public delegate void Delegate(float duration, float amplitude, float frequency, float amplitudeX, float amplitudeY, float amplitudeZ, bool infinite = false, MMChannelData channelData = null, bool useUnscaledTime = false);
 
-		static public void Unregister(Delegate callback)
+		static public void Trigger(float duration, float amplitude, float frequency, float amplitudeX, float amplitudeY, float amplitudeZ, bool infinite = false, MMChannelData channelData = null, bool useUnscaledTime = false)
 		{
-			OnEvent -= callback;
-		}
-
-		static public void Trigger(float duration, float amplitude, float frequency, float amplitudeX, float amplitudeY, float amplitudeZ, bool infinite = false, int channel = 0, bool useUnscaledTime = false)
-		{
-			OnEvent?.Invoke(duration, amplitude, frequency, amplitudeX, amplitudeY, amplitudeZ, infinite, channel, useUnscaledTime);
+			OnEvent?.Invoke(duration, amplitude, frequency, amplitudeX, amplitudeY, amplitudeZ, infinite, channelData, useUnscaledTime);
 		}
 	}
 
 	public struct MMCameraShakeStopEvent
 	{
-		public delegate void Delegate(int channel);
 		static private event Delegate OnEvent;
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)] private static void RuntimeInitialization() { OnEvent = null; }
+		static public void Register(Delegate callback) { OnEvent += callback; }
+		static public void Unregister(Delegate callback) { OnEvent -= callback; }
 
-		static public void Register(Delegate callback)
-		{
-			OnEvent += callback;
-		}
+		public delegate void Delegate(MMChannelData channelData);
 
-		static public void Unregister(Delegate callback)
+		static public void Trigger(MMChannelData channelData)
 		{
-			OnEvent -= callback;
-		}
-
-		static public void Trigger(int channel)
-		{
-			OnEvent?.Invoke(channel);
+			OnEvent?.Invoke(channelData);
 		}
 	}
 
 	[RequireComponent(typeof(MMWiggle))]
-	[AddComponentMenu("More Mountains/Feedbacks/Shakers/Camera/MMCameraShaker")]
+	[AddComponentMenu("More Mountains/Feedbacks/Shakers/Camera/MM Camera Shaker")]
 	/// <summary>
 	/// A class to add to your camera. It'll listen to MMCameraShakeEvents and will shake your camera accordingly
 	/// </summary>
 	public class MMCameraShaker : MonoBehaviour
 	{
-		/// the channel to broadcast this shake on
-		[Tooltip("the channel to broadcast this shake on")]
+		/// whether to listen on a channel defined by an int or by a MMChannel scriptable object. Ints are simple to setup but can get messy and make it harder to remember what int corresponds to what.
+		/// MMChannel scriptable objects require you to create them in advance, but come with a readable name and are more scalable
+		[Tooltip("whether to listen on a channel defined by an int or by a MMChannel scriptable object. Ints are simple to setup but can get messy and make it harder to remember what int corresponds to what. " +
+		         "MMChannel scriptable objects require you to create them in advance, but come with a readable name and are more scalable")]
+		public MMChannelModes ChannelMode = MMChannelModes.Int;
+		/// the channel to listen to - has to match the one on the feedback
+		[Tooltip("the channel to listen to - has to match the one on the feedback")]
+		[MMEnumCondition("ChannelMode", (int)MMChannelModes.Int)]
 		public int Channel = 0;
+		/// the MMChannel definition asset to use to listen for events. The feedbacks targeting this shaker will have to reference that same MMChannel definition to receive events - to create a MMChannel,
+		/// right click anywhere in your project (usually in a Data folder) and go MoreMountains > MMChannel, then name it with some unique name
+		[Tooltip("the MMChannel definition asset to use to listen for events. The feedbacks targeting this shaker will have to reference that same MMChannel definition to receive events - to create a MMChannel, " +
+		         "right click anywhere in your project (usually in a Data folder) and go MoreMountains > MMChannel, then name it with some unique name")]
+		[MMEnumCondition("ChannelMode", (int)MMChannelModes.MMChannel)]
+		public MMChannel MMChannelDefinition = null;
 		/// a cooldown, in seconds, after a shake, during which no other shake can start
 		[Tooltip("a cooldown, in seconds, after a shake, during which no other shake can start")]
 		public float CooldownBetweenShakes = 0f;
@@ -149,7 +141,7 @@ namespace MoreMountains.Feedbacks
 				_wiggle.PositionWiggleProperties.AmplitudeMax = Vector3.one * amplitude;
 			}
 
-			_shakeStartedTimestamp = Time.time;
+			_shakeStartedTimestamp = Time.unscaledTime;
 			_wiggle.PositionWiggleProperties.UseUnscaledTime = useUnscaledTime;
 			_wiggle.PositionWiggleProperties.FrequencyMin = frequency;
 			_wiggle.PositionWiggleProperties.FrequencyMax = frequency;
@@ -162,9 +154,9 @@ namespace MoreMountains.Feedbacks
 		/// When a MMCameraShakeEvent is caught, shakes the camera
 		/// </summary>
 		/// <param name="shakeEvent">Shake event.</param>
-		public virtual void OnCameraShakeEvent(float duration, float amplitude, float frequency, float amplitudeX, float amplitudeY, float amplitudeZ, bool infinite, int channel, bool useUnscaledTime)
+		public virtual void OnCameraShakeEvent(float duration, float amplitude, float frequency, float amplitudeX, float amplitudeY, float amplitudeZ, bool infinite, MMChannelData channelData, bool useUnscaledTime)
 		{
-			if (channel != Channel)
+			if (!MMChannel.Match(channelData, ChannelMode, Channel, MMChannelDefinition))
 			{
 				return;
 			}

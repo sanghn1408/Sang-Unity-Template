@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 #if MM_CINEMACHINE
 using Cinemachine;
+#elif MM_CINEMACHINE3
+using Unity.Cinemachine;
 #endif
 using MoreMountains.Feedbacks;
 using MoreMountains.Tools;
@@ -12,9 +14,11 @@ namespace MoreMountains.FeedbacksForThirdParty
 	/// <summary>
 	/// Add this to a Cinemachine virtual camera and it'll let you control its near and far clipping planes
 	/// </summary>
-	[AddComponentMenu("More Mountains/Feedbacks/Shakers/Cinemachine/MMCinemachineClippingPlanesShaker")]
+	[AddComponentMenu("More Mountains/Feedbacks/Shakers/Cinemachine/MM Cinemachine Clipping Planes Shaker")]
 	#if MM_CINEMACHINE
 	[RequireComponent(typeof(CinemachineVirtualCamera))]
+	#elif MM_CINEMACHINE3
+	[RequireComponent(typeof(CinemachineCamera))]
 	#endif
 	public class MMCinemachineClippingPlanesShaker : MMShaker
 	{
@@ -46,6 +50,9 @@ namespace MoreMountains.FeedbacksForThirdParty
 
 		#if MM_CINEMACHINE
 		protected CinemachineVirtualCamera _targetCamera;
+		#elif  MM_CINEMACHINE3
+		protected CinemachineCamera _targetCamera;
+		#endif
 		protected float _initialNear;
 		protected float _initialFar;
 		protected float _originalShakeDuration;
@@ -63,7 +70,11 @@ namespace MoreMountains.FeedbacksForThirdParty
 		protected override void Initialization()
 		{
 			base.Initialization();
+			#if MM_CINEMACHINE
 			_targetCamera = this.gameObject.GetComponent<CinemachineVirtualCamera>();
+			#elif  MM_CINEMACHINE3
+			_targetCamera = this.gameObject.GetComponent<CinemachineCamera>();
+			#endif
 		}
 
 		/// <summary>
@@ -80,9 +91,19 @@ namespace MoreMountains.FeedbacksForThirdParty
 		protected override void Shake()
 		{
 			float newNear = ShakeFloat(ShakeNear, RemapNearZero, RemapNearOne, RelativeClippingPlanes, _initialNear);
-			_targetCamera.m_Lens.NearClipPlane = newNear;
 			float newFar = ShakeFloat(ShakeFar, RemapFarZero, RemapFarOne, RelativeClippingPlanes, _initialFar);
-			_targetCamera.m_Lens.FarClipPlane = newFar;
+			SetNearFar(newNear, newFar);
+		}
+
+		protected virtual void SetNearFar(float near, float far)
+		{
+			#if MM_CINEMACHINE
+			_targetCamera.m_Lens.NearClipPlane = near;
+			_targetCamera.m_Lens.FarClipPlane = far;
+			#elif  MM_CINEMACHINE3
+			_targetCamera.Lens.NearClipPlane = near;
+			_targetCamera.Lens.FarClipPlane = far;
+			#endif
 		}
 
 		/// <summary>
@@ -90,8 +111,13 @@ namespace MoreMountains.FeedbacksForThirdParty
 		/// </summary>
 		protected override void GrabInitialValues()
 		{
+			#if MM_CINEMACHINE
 			_initialNear = _targetCamera.m_Lens.NearClipPlane;
 			_initialFar = _targetCamera.m_Lens.FarClipPlane;
+			#elif  MM_CINEMACHINE3
+			_initialNear = _targetCamera.Lens.NearClipPlane;
+			_initialFar = _targetCamera.Lens.FarClipPlane;
+			#endif
 		}
 
 		/// <summary>
@@ -104,9 +130,10 @@ namespace MoreMountains.FeedbacksForThirdParty
 		/// <param name="feedbacksIntensity"></param>
 		/// <param name="channel"></param>
 		public virtual void OnMMCameraClippingPlanesShakeEvent(AnimationCurve animNearCurve, float duration, float remapNearMin, float remapNearMax, AnimationCurve animFarCurve, float remapFarMin, float remapFarMax, bool relativeValues = false,
-			float feedbacksIntensity = 1.0f, int channel = 0, bool resetShakerValuesAfterShake = true, bool resetTargetValuesAfterShake = true, bool forwardDirection = true, TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false)
+			float feedbacksIntensity = 1.0f, MMChannelData channelData = null, bool resetShakerValuesAfterShake = true, bool resetTargetValuesAfterShake = true, bool forwardDirection = true, 
+			TimescaleModes timescaleMode = TimescaleModes.Scaled, bool stop = false, bool restore = false)
 		{
-			if (!CheckEventAllowed(channel))
+			if (!CheckEventAllowed(channelData))
 			{
 				return;
 			}
@@ -114,6 +141,12 @@ namespace MoreMountains.FeedbacksForThirdParty
 			if (stop)
 			{
 				Stop();
+				return;
+			}
+            
+			if (restore)
+			{
+				ResetTargetValues();
 				return;
 			}
             
@@ -137,16 +170,19 @@ namespace MoreMountains.FeedbacksForThirdParty
 				_originalRelativeClippingPlanes = RelativeClippingPlanes;
 			}
 
-			TimescaleMode = timescaleMode;
-			ShakeDuration = duration;
-			ShakeNear = animNearCurve;
-			RemapNearZero = remapNearMin * feedbacksIntensity;
-			RemapNearOne = remapNearMax * feedbacksIntensity;
-			ShakeFar = animFarCurve;
-			RemapFarZero = remapFarMin * feedbacksIntensity;
-			RemapFarOne = remapFarMax * feedbacksIntensity;
-			RelativeClippingPlanes = relativeValues;
-			ForwardDirection = forwardDirection;
+			if (!OnlyUseShakerValues)
+			{
+				TimescaleMode = timescaleMode;
+				ShakeDuration = duration;
+				ShakeNear = animNearCurve;
+				RemapNearZero = remapNearMin * feedbacksIntensity;
+				RemapNearOne = remapNearMax * feedbacksIntensity;
+				ShakeFar = animFarCurve;
+				RemapFarZero = remapFarMin * feedbacksIntensity;
+				RemapFarOne = remapFarMax * feedbacksIntensity;
+				RelativeClippingPlanes = relativeValues;
+				ForwardDirection = forwardDirection;	
+			}
 
 			Play();
 		}
@@ -157,8 +193,7 @@ namespace MoreMountains.FeedbacksForThirdParty
 		protected override void ResetTargetValues()
 		{
 			base.ResetTargetValues();
-			_targetCamera.m_Lens.NearClipPlane = _initialNear;
-			_targetCamera.m_Lens.FarClipPlane = _initialFar;
+			SetNearFar(_initialNear, _initialFar);
 		}
 
 		/// <summary>
@@ -194,6 +229,5 @@ namespace MoreMountains.FeedbacksForThirdParty
 			base.StopListening();
 			MMCameraClippingPlanesShakeEvent.Unregister(OnMMCameraClippingPlanesShakeEvent);
 		}
-		#endif
 	}
 }

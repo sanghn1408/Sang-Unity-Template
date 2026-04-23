@@ -579,9 +579,25 @@ namespace VTabs
                         if (folderGuid.IsNullOrEmpty()) return;
 
 
-                        var iid = AssetDatabase.LoadAssetAtPath<Object>(AssetDatabase.GUIDToAssetPath(folderGuid)).GetInstanceID();
+                        var folderPath = AssetDatabase.GUIDToAssetPath(folderGuid);
+                        if (folderPath.IsNullOrEmpty()) return;
 
-                        window.GetFieldValue("m_ListAreaState").SetFieldValue("m_SelectedInstanceIDs", new List<int> { iid });
+                        var folder = AssetDatabase.LoadAssetAtPath<Object>(folderPath);
+                        if (!folder) return;
+
+                        var iid = folder.GetInstanceID();
+
+                        var folderSelectionApplied = false;
+
+                        try
+                        {
+                            window.InvokeMethod("SetFolderSelection", new[] { iid }, false);
+                            folderSelectionApplied = true;
+                        }
+                        catch { }
+
+                        if (!folderSelectionApplied)
+                            window.GetFieldValue("m_ListAreaState").SetFieldValue("m_SelectedInstanceIDs", new List<int> { iid });
 
                         t_ProjectBrowser.InvokeMethod("OpenSelectedFolders");
 
@@ -1330,7 +1346,8 @@ namespace VTabs
         {
 
             var dockArea = activeTab.GetMemberValue("m_Parent");
-            var tabAreaWidth = dockArea.GetFieldValue<Rect>("m_TabAreaRect").width;
+            var tabAreaRectObject = dockArea.GetFieldValue("m_TabAreaRect", false);
+            var tabAreaWidth = tabAreaRectObject is Rect tabAreaRect ? tabAreaRect.width : 0f;
 
             if (tabAreaWidth == 0)
                 tabAreaWidth = activeTab.position.width - 38;

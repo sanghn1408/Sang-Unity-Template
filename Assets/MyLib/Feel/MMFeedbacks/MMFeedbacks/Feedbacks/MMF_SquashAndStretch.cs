@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Serialization;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
@@ -11,8 +12,9 @@ namespace MoreMountains.Feedbacks
 	/// This feedback will let you modify the scale of an object on an axis while the other two axis (or only one) get automatically modified to conserve mass
 	/// </summary>
 	[AddComponentMenu("")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
 	[FeedbackPath("Transform/Squash and Stretch")]
-	[FeedbackHelp("This feedback will let you modify the scale of an object on an axis while the other two axis (or only one) get automatically modified to conserve mass.")]
+	[FeedbackHelp("This feedback will let you modify the scale of an object on an axis while the other two axis (or only one) get automatically modified to conserve mass. Careful, the object you'll target with this needs to have a normalized scale.")]
 	public class MMF_SquashAndStretch : MMF_Feedback
 	{
 		/// sets the inspector color for this feedback
@@ -22,12 +24,15 @@ namespace MoreMountains.Feedbacks
 		public override string RequiredTargetText { get { return SquashAndStretchTarget != null ? SquashAndStretchTarget.name : "";  } }
 		public override string RequiresSetupText { get { return "This feedback requires that a SquashAndStretchTarget be set to be able to work properly. You can set one below."; } }
 		#endif
+		public override bool HasAutomatedTargetAcquisition => true;
+		protected override void AutomateTargetAcquisition() => SquashAndStretchTarget = FindAutomatedTarget<Transform>();
+		
 		/// a static bool used to disable all feedbacks of this type at once
 		public static bool FeedbackTypeAuthorized = true;
 		/// the possible modes this feedback can operate on
 		public enum Modes { Absolute, Additive, ToDestination }
 		/// the various axis on which to apply the squash and stretch
-		public enum PossibleAxis { XtoYZ, XtoY, XtoZ, YtoXZ, YtoX, YtoZ, ZtoXZ, ZtoX, ZtoY }
+		public enum PossibleAxis { XtoYZ, XtoY, XtoZ, YtoXZ, YtoX, YtoZ, ZtoXY, ZtoX, ZtoY }
 		/// the possible timescales for the animation of the scale
 		public enum TimeScales { Scaled, Unscaled }
 
@@ -75,6 +80,7 @@ namespace MoreMountains.Feedbacks
 
 		/// the duration of this feedback is the duration of the scale animation
 		public override float FeedbackDuration { get { return ApplyTimeMultiplier(AnimateScaleDuration); } set { AnimateScaleDuration = value; } }
+		public override bool HasRandomness => true;
 
 		protected Vector3 _initialScale;
 		protected float _initialAxisScale;
@@ -124,7 +130,7 @@ namespace MoreMountains.Feedbacks
 				case PossibleAxis.YtoZ:
 					_initialAxisScale = SquashAndStretchTarget.localScale.y;
 					break;
-				case PossibleAxis.ZtoXZ:
+				case PossibleAxis.ZtoXY:
 					_initialAxisScale = SquashAndStretchTarget.localScale.z;
 					break;
 				case PossibleAxis.ZtoX:
@@ -155,7 +161,7 @@ namespace MoreMountains.Feedbacks
             
 			GetAxisScale();
             
-			float intensityMultiplier = Timing.ConstantIntensity ? 1f : feedbacksIntensity;
+			float intensityMultiplier = ComputeIntensity(feedbacksIntensity, position);
 			if (Active || Owner.AutoPlayOnEnable)
 			{
 				if ((Mode == Modes.Absolute) || (Mode == Modes.Additive))
@@ -164,7 +170,8 @@ namespace MoreMountains.Feedbacks
 					{
 						return;
 					}
-					_coroutine = Owner.StartCoroutine(AnimateScale(SquashAndStretchTarget, FeedbackDuration, AnimateCurve, Axis, RemapCurveZero * intensityMultiplier, RemapCurveOne * intensityMultiplier));
+					if (_coroutine != null) { Owner.StopCoroutine(_coroutine); }
+					_coroutine = Owner.StartCoroutine(AnimateScale(SquashAndStretchTarget, FeedbackDuration, AnimateCurve, Axis, RemapCurveZero, RemapCurveOne * intensityMultiplier));
 				}
 				if (Mode == Modes.ToDestination)
 				{
@@ -172,6 +179,7 @@ namespace MoreMountains.Feedbacks
 					{
 						return;
 					}
+					if (_coroutine != null) { Owner.StopCoroutine(_coroutine); }
 					_coroutine = Owner.StartCoroutine(ScaleToDestination());
 				}                   
 			}
@@ -253,37 +261,37 @@ namespace MoreMountains.Feedbacks
 			while ((journey >= 0) && (journey <= duration) && (duration > 0))
 			{
 				float percent = Mathf.Clamp01(journey / duration);
-
-				float newScale = curve.Evaluate(percent) + Offset;
-				newScale = MMFeedbacksHelpers.Remap(newScale, 0f, 1f, remapCurveZero, remapCurveOne);
-				if (Mode == Modes.Additive)
-				{
-					newScale += _initialAxisScale;
-				}
-
-				ApplyScale(newScale);
-				targetTransform.localScale = _newScale;
-                
+				ComputeAndApplyScale(percent, curve, remapCurveZero, remapCurveOne, targetTransform);
 				journey += NormalPlayDirection ? FeedbackDeltaTime : -FeedbackDeltaTime;
-                
 				yield return null;
 			}
 
-			float finalScale;
-            
-			finalScale = curve.Evaluate(FinalNormalizedTime) + Offset;
-			finalScale = MMFeedbacksHelpers.Remap(finalScale, 0f, 1f, remapCurveZero, remapCurveOne);
-			if (Mode == Modes.Additive)
-			{
-				finalScale += _initialAxisScale;
-			}
-            
-			ApplyScale(finalScale);
-            
-			targetTransform.localScale = _newScale;
+			float endTime = NormalPlayDirection ? 1f : 0f;
+			ComputeAndApplyScale(endTime, curve, remapCurveZero, remapCurveOne, targetTransform);
 			_coroutine = null;
 			IsPlaying = false;
 			yield return null;
+		}
+
+		/// <summary>
+		/// Computes the new scale based on the current percent, and applies it to the transform
+		/// </summary>
+		/// <param name="percent"></param>
+		/// <param name="curve"></param>
+		/// <param name="remapCurveZero"></param>
+		/// <param name="remapCurveOne"></param>
+		/// <param name="targetTransform"></param>
+		protected virtual void ComputeAndApplyScale(float percent, AnimationCurve curve, float remapCurveZero, float remapCurveOne, Transform targetTransform)
+		{
+			float newScale = curve.Evaluate(percent) + Offset;
+			newScale = MMFeedbacksHelpers.Remap(newScale, 0f, 1f, remapCurveZero, remapCurveOne);
+			if (Mode == Modes.Additive)
+			{
+				newScale += _initialAxisScale;
+			}
+			newScale = Mathf.Abs(newScale);
+			ApplyScale(newScale);
+			targetTransform.localScale = _newScale;
 		}
 
 		/// <summary>
@@ -292,53 +300,54 @@ namespace MoreMountains.Feedbacks
 		/// <param name="newScale"></param>
 		protected virtual void ApplyScale(float newScale)
 		{
+			_newScale = _initialScale;
 			float invertScale = 1 / Mathf.Sqrt(newScale);
 			switch (Axis)
 			{
 				case PossibleAxis.XtoYZ:
-					_newScale.x = newScale;
-					_newScale.y = invertScale;
-					_newScale.z = invertScale;
+					_newScale.x = _initialScale.x * newScale;
+					_newScale.y = _initialScale.y * invertScale;
+					_newScale.z = _initialScale.z * invertScale;
 					break;
 				case PossibleAxis.XtoY:
-					_newScale.x = newScale;
-					_newScale.y = invertScale;
+					_newScale.x = _initialScale.x * newScale;
+					_newScale.y = _initialScale.y * invertScale;
 					_newScale.z = _initialScale.z;
 					break;
 				case PossibleAxis.XtoZ:
-					_newScale.x = newScale;
+					_newScale.x = _initialScale.x * newScale;
 					_newScale.y = _initialScale.y;
-					_newScale.z = invertScale;
+					_newScale.z = _initialScale.z * invertScale;
 					break;
 				case PossibleAxis.YtoXZ:
-					_newScale.x = invertScale;
-					_newScale.y = newScale;
-					_newScale.z = invertScale;
+					_newScale.x = _initialScale.x * invertScale;
+					_newScale.y = _initialScale.y * newScale;
+					_newScale.z = _initialScale.z * invertScale;
 					break;
 				case PossibleAxis.YtoX:
-					_newScale.x = invertScale;
-					_newScale.y = newScale;
+					_newScale.x = _initialScale.x * invertScale;
+					_newScale.y = _initialScale.y * newScale;
 					_newScale.z = _initialScale.z;
 					break;
 				case PossibleAxis.YtoZ:
-					_newScale.x = newScale;
+					_newScale.x = _initialScale.x * newScale;
 					_newScale.y = _initialScale.y;
-					_newScale.z = invertScale;
+					_newScale.z = _initialScale.z * invertScale;
 					break;
-				case PossibleAxis.ZtoXZ:
-					_newScale.x = invertScale;
-					_newScale.y = invertScale;
-					_newScale.z = newScale;
+				case PossibleAxis.ZtoXY:
+					_newScale.x = _initialScale.x * invertScale;
+					_newScale.y = _initialScale.y * invertScale;
+					_newScale.z = _initialScale.z * newScale;
 					break;
 				case PossibleAxis.ZtoX:
-					_newScale.x = invertScale;
+					_newScale.x = _initialScale.x * invertScale;
 					_newScale.y = _initialScale.y;
-					_newScale.z = newScale;
+					_newScale.z = _initialScale.z * newScale;
 					break;
 				case PossibleAxis.ZtoY:
 					_newScale.x = _initialScale.x;
-					_newScale.y = invertScale;
-					_newScale.z = newScale;
+					_newScale.y = _initialScale.y * invertScale;
+					_newScale.z = _initialScale.z * newScale;
 					break;
 			}
 		}
@@ -364,6 +373,19 @@ namespace MoreMountains.Feedbacks
 		public override void OnDisable()
 		{
 			_coroutine = null;
+		}
+		
+		/// <summary>
+		/// On restore, we restore our initial state
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+
+			SquashAndStretchTarget.localScale = _initialScale;
 		}
 	}
 }

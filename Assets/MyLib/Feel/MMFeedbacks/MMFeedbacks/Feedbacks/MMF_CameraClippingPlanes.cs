@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Audio;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
@@ -9,6 +10,7 @@ namespace MoreMountains.Feedbacks
 	/// This feedback lets you control a camera's clipping planes over time. You'll need a MMCameraClippingPlanesShaker on your camera.
 	/// </summary>
 	[AddComponentMenu("")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
 	[FeedbackPath("Camera/Clipping Planes")]
 	[FeedbackHelp("This feedback lets you control a camera's clipping planes over time. You'll need a MMCameraClippingPlanesShaker on your camera.")]
 	public class MMF_CameraClippingPlanes : MMF_Feedback
@@ -18,11 +20,12 @@ namespace MoreMountains.Feedbacks
 		/// sets the inspector color for this feedback
 		#if UNITY_EDITOR
 		public override Color FeedbackColor { get { return MMFeedbacksInspectorColors.CameraColor; } }
-		public override string RequiredTargetText { get { return "Channel "+Channel;  } }
+		public override string RequiredTargetText => RequiredChannelText;
 		#endif
 		/// returns the duration of the feedback
 		public override float FeedbackDuration { get { return ApplyTimeMultiplier(Duration); } set { Duration = value; } }
 		public override bool HasChannel => true;
+		public override bool HasRandomness => true;
 
 		[MMFInspectorGroup("Clipping Planes", true, 52)]
 		/// the duration of the shake, in seconds
@@ -71,10 +74,13 @@ namespace MoreMountains.Feedbacks
 			{
 				return;
 			}
+
+			feedbacksIntensity = ComputeIntensity(feedbacksIntensity, position);
+			
 			MMCameraClippingPlanesShakeEvent.Trigger(ShakeNear, FeedbackDuration, RemapNearZero, RemapNearOne, 
 				ShakeFar, RemapFarZero, RemapFarOne,
 				RelativeClippingPlanes,
-				feedbacksIntensity, Channel, ResetShakerValuesAfterShake, ResetTargetValuesAfterShake, NormalPlayDirection, Timing.TimescaleMode);
+				feedbacksIntensity, ChannelData, ResetShakerValuesAfterShake, ResetTargetValuesAfterShake, NormalPlayDirection, ComputedTimescaleMode);
 		}
 
 		/// <summary>
@@ -91,6 +97,19 @@ namespace MoreMountains.Feedbacks
 			base.CustomStopFeedback(position, feedbacksIntensity);
 			MMCameraClippingPlanesShakeEvent.Trigger(ShakeNear, FeedbackDuration, RemapNearZero, RemapNearOne, 
 				ShakeFar, RemapFarZero, RemapFarOne, stop: true);
+		}
+		
+		/// <summary>
+		/// On restore, we restore our initial state
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+			MMCameraClippingPlanesShakeEvent.Trigger(ShakeNear, FeedbackDuration, RemapNearZero, RemapNearOne, 
+				ShakeFar, RemapFarZero, RemapFarOne, restore: true);
 		}
 	}
 }

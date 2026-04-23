@@ -182,12 +182,203 @@ namespace VTabs.Libs
 
 
             if (type.GetFieldInfo(fieldName) is FieldInfo fieldInfo)
-                fieldInfo.SetValue(target, value);
+            {
+                var valueToSet = value;
+
+                if (value != null && !fieldInfo.FieldType.IsInstanceOfType(value))
+                {
+                    if (!TryConvertValueForField(fieldInfo.FieldType, value, out valueToSet))
+                    {
+                        Debug.LogWarning($"[VTabs] Skipped setting field '{fieldName}' on '{type.Name}' due to incompatible value type '{value.GetType().FullName}' (expected '{fieldInfo.FieldType.FullName}')");
+                        return;
+                    }
+                }
+
+                fieldInfo.SetValue(target, valueToSet);
+            }
 
 
             else if (exceptionIfNotFound)
                 throw new System.Exception($"Field '{fieldName}' not found in type '{type.Name}' and its parent types");
 
+        }
+
+        static bool TryConvertValueForField(Type targetType, object sourceValue, out object convertedValue)
+        {
+            convertedValue = null;
+
+            if (sourceValue == null)
+                return false;
+
+            if (targetType.IsInstanceOfType(sourceValue))
+            {
+                convertedValue = sourceValue;
+                return true;
+            }
+
+            if (sourceValue is IEnumerable sourceEnumerable && !(sourceValue is string))
+            {
+                if (targetType.IsArray)
+                {
+                    var elementType = targetType.GetElementType();
+                    if (elementType == null) return false;
+
+                    var elements = new List<object>();
+                    foreach (var item in sourceEnumerable)
+                    {
+                        if (!TryConvertSingleValue(elementType, item, out var convertedElement))
+                            return false;
+
+                        elements.Add(convertedElement);
+                    }
+
+                    var array = System.Array.CreateInstance(elementType, elements.Count);
+                    for (int i = 0; i < elements.Count; i++)
+                        array.SetValue(elements[i], i);
+
+                    convertedValue = array;
+                    return true;
+                }
+
+                if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(List<>))
+                {
+                    var elementType = targetType.GetGenericArguments()[0];
+                    if (!(System.Activator.CreateInstance(targetType) is IList typedList))
+                        return false;
+
+                    foreach (var item in sourceEnumerable)
+                    {
+                        if (!TryConvertSingleValue(elementType, item, out var convertedElement))
+                            return false;
+
+                        typedList.Add(convertedElement);
+                    }
+
+                    convertedValue = typedList;
+                    return true;
+                }
+            }
+
+            return TryConvertSingleValue(targetType, sourceValue, out convertedValue);
+        }
+
+        static bool TryConvertSingleValue(Type targetType, object sourceValue, out object convertedValue)
+        {
+            convertedValue = null;
+
+            if (sourceValue == null)
+                return !targetType.IsValueType || System.Nullable.GetUnderlyingType(targetType) != null;
+
+            if (targetType.IsInstanceOfType(sourceValue))
+            {
+                convertedValue = sourceValue;
+                return true;
+            }
+
+            try
+            {
+                if (sourceValue is int sourceInt && TryConvertIntLikeValue(targetType, sourceInt, out convertedValue))
+                    return true;
+
+                if (targetType.IsEnum)
+                {
+                    convertedValue = sourceValue is string s
+                        ? System.Enum.Parse(targetType, s, true)
+                        : System.Enum.ToObject(targetType, sourceValue);
+                    return true;
+                }
+
+                var nullableUnderlying = System.Nullable.GetUnderlyingType(targetType);
+                var effectiveType = nullableUnderlying ?? targetType;
+
+                if (sourceValue is System.IConvertible && typeof(System.IConvertible).IsAssignableFrom(effectiveType))
+                {
+                    convertedValue = System.Convert.ChangeType(sourceValue, effectiveType);
+                    return true;
+                }
+
+                if (effectiveType == typeof(string))
+                {
+                    convertedValue = sourceValue.ToString();
+                    return true;
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+        static bool TryConvertIntLikeValue(Type targetType, int sourceInt, out object convertedValue)
+        {
+            convertedValue = null;
+
+            if (targetType == typeof(int))
+            {
+                convertedValue = sourceInt;
+                return true;
+            }
+
+            try
+            {
+                var ctor = targetType.GetConstructor(maxBindingFlags, null, new[] { typeof(int) }, null);
+                if (ctor != null)
+                {
+                    convertedValue = ctor.Invoke(new object[] { sourceInt });
+                    return true;
+                }
+            }
+            catch { }
+
+            try
+            {
+                var implicitOperator = targetType.GetMethods(maxBindingFlags)
+                    .FirstOrDefault(m =>
+                        m.IsStatic &&
+                        m.Name == "op_Implicit" &&
+                        m.ReturnType == targetType &&
+                        m.GetParameters().Length == 1 &&
+                        m.GetParameters()[0].ParameterType == typeof(int));
+
+                if (implicitOperator != null)
+                {
+                    convertedValue = implicitOperator.Invoke(null, new object[] { sourceInt });
+                    return true;
+                }
+            }
+            catch { }
+
+            try
+            {
+                var boxed = System.Activator.CreateInstance(targetType);
+                if (boxed == null) return false;
+
+                var intField = targetType.GetFields(maxBindingFlags)
+                    .FirstOrDefault(f => !f.IsStatic && (f.FieldType == typeof(int) || f.FieldType == typeof(uint) || f.FieldType == typeof(long) || f.FieldType == typeof(ulong)));
+
+                if (intField != null)
+                {
+                    intField.SetValue(boxed, System.Convert.ChangeType(sourceInt, intField.FieldType));
+                    convertedValue = boxed;
+                    return true;
+                }
+
+                var intProperty = targetType.GetProperties(maxBindingFlags)
+                    .FirstOrDefault(p =>
+                        p.CanWrite &&
+                        p.SetMethod != null &&
+                        !p.SetMethod.IsStatic &&
+                        (p.PropertyType == typeof(int) || p.PropertyType == typeof(uint) || p.PropertyType == typeof(long) || p.PropertyType == typeof(ulong)));
+
+                if (intProperty != null)
+                {
+                    intProperty.SetValue(boxed, System.Convert.ChangeType(sourceInt, intProperty.PropertyType));
+                    convertedValue = boxed;
+                    return true;
+                }
+            }
+            catch { }
+
+            return false;
         }
         public static void SetPropertyValue(this object o, string propertyName, object value, bool exceptionIfNotFound = true)
         {

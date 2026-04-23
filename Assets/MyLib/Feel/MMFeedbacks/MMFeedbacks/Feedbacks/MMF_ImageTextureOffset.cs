@@ -3,7 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using MoreMountains.Tools;
 using UnityEngine;
+#if MM_UI
 using UnityEngine.UI;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace MoreMountains.Feedbacks
 {
@@ -12,6 +14,7 @@ namespace MoreMountains.Feedbacks
 	/// </summary>
 	[AddComponentMenu("")]
 	[FeedbackHelp("This feedback will let you control the texture offset of a target UI Image over time.")]
+	[MovedFrom(false, null, "MoreMountains.Feedbacks")]
 	[FeedbackPath("UI/Image Texture Offset")]
 	public class MMF_ImageTextureOffset : MMF_Feedback
 	{
@@ -24,6 +27,8 @@ namespace MoreMountains.Feedbacks
 		public override string RequiredTargetText { get { return TargetImage != null ? TargetImage.name : "";  } }
 		public override string RequiresSetupText { get { return "This feedback requires that a TargetImage be set to be able to work properly. You can set one below."; } }
 		#endif
+		public override bool HasAutomatedTargetAcquisition => true;
+		protected override void AutomateTargetAcquisition() => TargetImage = FindAutomatedTarget<Image>();
 
 		/// the possible modes for this feedback
 		public enum Modes { OverTime, Instant }
@@ -60,13 +65,15 @@ namespace MoreMountains.Feedbacks
 		[Tooltip("the curve to tween the offset on")]
 		[MMFEnumCondition("Mode", (int)Modes.OverTime)]
 		public AnimationCurve OffsetCurve = new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.3f, 1f), new Keyframe(1, 0));
-		/// the value to remap the offset curve's 0 to
-		[Tooltip("the value to remap the offset curve's 0 to")]
+		/// the value to remap the offset curve's 0 to, randomized between its min and max - put the same value in both min and max if you don't want any randomness
+		[Tooltip("the value to remap the offset curve's 0 to, randomized between its min and max - put the same value in both min and max if you don't want any randomness")]
 		[MMFEnumCondition("Mode", (int)Modes.OverTime)]
+		[MMFVector("Min", "Max")]
 		public Vector2 RemapZero = Vector2.zero;
-		/// the value to remap the offset curve's 1 to
-		[Tooltip("the value to remap the offset curve's 1 to")]
+		/// the value to remap the offset curve's 1 to, randomized between its min and max - put the same value in both min and max if you don't want any randomness
+		[Tooltip("the value to remap the offset curve's 1 to, randomized between its min and max - put the same value in both min and max if you don't want any randomness")]
 		[MMFEnumCondition("Mode", (int)Modes.OverTime)]
+		[MMFVector("Min", "Max")]
 		public Vector2 RemapOne = Vector2.one;
 		/// the value to move the intensity to in instant mode
 		[Tooltip("the value to move the intensity to in instant mode")]
@@ -80,6 +87,7 @@ namespace MoreMountains.Feedbacks
 
 		/// the duration of this feedback is the duration of the transition
 		public override float FeedbackDuration { get { return (Mode == Modes.Instant) ? 0f : ApplyTimeMultiplier(Duration); } set { Duration = value; } }
+		public override bool HasRandomness => true;
 
 		/// <summary>
 		/// On init we store our initial texture offset
@@ -88,6 +96,12 @@ namespace MoreMountains.Feedbacks
 		protected override void CustomInitialization(MMF_Player owner)
 		{
 			base.CustomInitialization(owner);
+			
+			if (TargetImage == null)
+			{
+				Debug.LogWarning("[Image Texture Offset Feedback] The image texture offset feedback on "+Owner.name+" doesn't have a TargetImage, it won't work. You need to specify an Image in its inspector.");
+				return;
+			}
 
 			_material = TargetImage.materialForRendering;
 
@@ -109,23 +123,31 @@ namespace MoreMountains.Feedbacks
 		/// <param name="feedbacksIntensity"></param>
 		protected override void CustomPlayFeedback(Vector3 position, float feedbacksIntensity = 1.0f)
 		{
-			if (!Active || !FeedbackTypeAuthorized)
+			if (!Active || !FeedbackTypeAuthorized || (TargetImage == null))
 			{
 				return;
 			}
             
-			float intensityMultiplier = Timing.ConstantIntensity ? 1f : feedbacksIntensity;
+			float intensityMultiplier = ComputeIntensity(feedbacksIntensity, position);
             
 			switch (Mode)
 			{
 				case Modes.Instant:
-					ApplyValue(InstantOffset * intensityMultiplier);
+					if (NormalPlayDirection)
+					{
+						ApplyValue(InstantOffset * intensityMultiplier);	
+					}
+					else
+					{
+						ApplyValue(_initialValue);
+					}
 					break;
 				case Modes.OverTime:
 					if (!AllowAdditivePlays && (_coroutine != null))
 					{
 						return;
 					}
+					if (_coroutine != null) { Owner.StopCoroutine(_coroutine); }
 					_coroutine = Owner.StartCoroutine(TransitionCo(intensityMultiplier));
 					break;
 			}
@@ -206,3 +228,4 @@ namespace MoreMountains.Feedbacks
 		}
 	}
 }
+#endif

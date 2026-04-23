@@ -1,7 +1,9 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using MoreMountains.Feedbacks;
+using UnityEngine.Scripting.APIUpdating;
+#if MM_URP
+using UnityEngine.Rendering.Universal;
+#endif
 
 namespace MoreMountains.FeedbacksForThirdParty
 {
@@ -14,6 +16,7 @@ namespace MoreMountains.FeedbacksForThirdParty
 	#if MM_URP
 	[FeedbackPath("PostProcess/Vignette URP")]
 	#endif
+	[MovedFrom(false, null, "MoreMountains.Feedbacks.URP")]
 	[FeedbackHelp("This feedback allows you to control vignette intensity over time. " +
 	              "It requires you have in your scene an object with a Volume " +
 	              "with Vignette active, and a MMVignetteShaker_URP component.")]
@@ -24,11 +27,14 @@ namespace MoreMountains.FeedbacksForThirdParty
 		/// sets the inspector color for this feedback
 		#if UNITY_EDITOR
 		public override Color FeedbackColor { get { return MMFeedbacksInspectorColors.PostProcessColor; } }
+		public override bool HasCustomInspectors => true;
+		public override bool HasAutomaticShakerSetup => true;
 		#endif
 
 		/// the duration of this feedback is the duration of the shake
 		public override float FeedbackDuration { get { return ApplyTimeMultiplier(Duration); } set { Duration = value; } }
 		public override bool HasChannel => true;
+		public override bool HasRandomness => true;
 
 		[MMFInspectorGroup("Vignette", true, 28)]
 		/// the duration of the shake, in seconds
@@ -56,6 +62,25 @@ namespace MoreMountains.FeedbacksForThirdParty
 		/// whether or not to add to the initial intensity
 		[Tooltip("whether or not to add to the initial intensity")]
 		public bool RelativeIntensity = false;
+		
+		[Header("Color")]
+		/// whether or not to also animate  the vignette's color
+		[Tooltip("whether or not to also animate the vignette's color")]
+		public bool InterpolateColor = false;
+		/// the curve to animate the color on
+		[Tooltip("the curve to animate the color on")]
+		public AnimationCurve ColorCurve = new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.05f, 1f), new Keyframe(0.95f, 1), new Keyframe(1, 0));
+		/// the value to remap the curve's 0 to
+		[Tooltip("the value to remap the curve's 0 to")]
+		[Range(0, 1)]
+		public float RemapColorZero = 0f;
+		/// the value to remap the curve's 1 to
+		[Tooltip("the value to remap the curve's 1 to")]
+		[Range(0f, 1f)]
+		public float RemapColorOne = 1f;
+		/// the color to lerp towards
+		[Tooltip("the color to lerp towards")]
+		public Color TargetColor = Color.red;
 
 		/// <summary>
 		/// Triggers a vignette shake
@@ -69,9 +94,10 @@ namespace MoreMountains.FeedbacksForThirdParty
 				return;
 			}
             
-			float intensityMultiplier = Timing.ConstantIntensity ? 1f : feedbacksIntensity;
+			float intensityMultiplier = ComputeIntensity(feedbacksIntensity, position);
 			MMVignetteShakeEvent_URP.Trigger(Intensity, FeedbackDuration, RemapIntensityZero, RemapIntensityOne, RelativeIntensity, intensityMultiplier,
-				Channel, ResetShakerValuesAfterShake, ResetTargetValuesAfterShake, NormalPlayDirection, Timing.TimescaleMode);
+				ChannelData, ResetShakerValuesAfterShake, ResetTargetValuesAfterShake, NormalPlayDirection, ComputedTimescaleMode, false, false, InterpolateColor,
+				ColorCurve, RemapColorZero, RemapColorOne, TargetColor);
             
 		}
         
@@ -88,8 +114,30 @@ namespace MoreMountains.FeedbacksForThirdParty
 			{
 				return;
 			}
-			MMVignetteShakeEvent_URP.Trigger(Intensity, FeedbackDuration, RemapIntensityZero, RemapIntensityOne, RelativeIntensity, stop: true, channel: Channel);
-            
+			MMVignetteShakeEvent_URP.Trigger(Intensity, FeedbackDuration, RemapIntensityZero, RemapIntensityOne, RelativeIntensity, stop: true, channelData: ChannelData);
+		}
+
+		/// <summary>
+		/// On restore, we put our object back at its initial position
+		/// </summary>
+		protected override void CustomRestoreInitialValues()
+		{
+			if (!Active || !FeedbackTypeAuthorized)
+			{
+				return;
+			}
+			
+			MMVignetteShakeEvent_URP.Trigger(Intensity, FeedbackDuration, RemapIntensityZero, RemapIntensityOne, RelativeIntensity, restore: true, channelData: ChannelData);
+		}
+		
+		/// <summary>
+		/// Automaticall sets up the post processing profile and shaker
+		/// </summary>
+		public override void AutomaticShakerSetup()
+		{
+			#if MM_URP && UNITY_EDITOR
+			MMURPHelpers.GetOrCreateVolume<Vignette, MMVignetteShaker_URP>(Owner, "Vignette");
+			#endif
 		}
 	}
 }
