@@ -1345,7 +1345,7 @@ namespace VTabs
         static float GetOptimalTabScrollerPosition(EditorWindow activeTab)
         {
 
-            var dockArea = activeTab.GetMemberValue("m_Parent");
+            var dockArea = GetDockArea(activeTab);
             var tabAreaRectObject = dockArea.GetFieldValue("m_TabAreaRect", false);
             var tabAreaWidth = tabAreaRectObject is Rect tabAreaRect ? tabAreaRect.width : 0f;
 
@@ -1704,9 +1704,55 @@ namespace VTabs
 
 
 
-        static object GetDockArea(EditorWindow window) => window.GetFieldValue("m_Parent");
+        static object FindViewWithM_PanesContainingWindow(EditorWindow window)
+        {
+            if (window == null) return null;
+            var host = window.GetFieldValue("m_Parent", false);
+            if (host is Object hostObj && !hostObj) return null;
+            if (host == null) return null;
 
-        static List<EditorWindow> GetTabList(EditorWindow window) => GetDockArea(window).GetFieldValue<List<EditorWindow>>("m_Panes");
+            var visited = new HashSet<object>();
+            var queue = new Queue<object>();
+
+            void TryEnqueue(object o)
+            {
+                if (o is Object uo && !uo) return;
+                if (o == null) return;
+                if (visited.Contains(o)) return;
+                visited.Add(o);
+                queue.Enqueue(o);
+            }
+
+            TryEnqueue(host);
+            while (queue.Count > 0)
+            {
+                var v = queue.Dequeue();
+                if (v.GetFieldValue<List<EditorWindow>>("m_Panes", false) is List<EditorWindow> panes && panes.Contains(window))
+                    return v;
+
+                TryEnqueue(v.GetPropertyValue("parent", false));
+                if (v.GetPropertyValue("children", false) is IEnumerable ch)
+                {
+                    foreach (var c in ch)
+                        TryEnqueue(c);
+                }
+            }
+            return null;
+        }
+
+        static object GetDockArea(EditorWindow window) => FindViewWithM_PanesContainingWindow(window) ?? window.GetFieldValue("m_Parent");
+
+        static List<EditorWindow> GetTabList(EditorWindow window)
+        {
+            if (window == null) return new List<EditorWindow>();
+            var withPanes = FindViewWithM_PanesContainingWindow(window);
+            if (withPanes != null && withPanes.GetFieldValue<List<EditorWindow>>("m_Panes", false) is { } list)
+                return list;
+            if (window.GetFieldValue("m_Parent", false) is { } parent
+                && parent.GetPropertyValue<EditorWindow>("actualView", false) is { } only && only == window)
+                return new List<EditorWindow> { window };
+            return new List<EditorWindow> { window };
+        }
 
 
 
