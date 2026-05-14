@@ -1332,20 +1332,27 @@ namespace VTabs
 
         static void EnsureTabVisibleOnScroller(EditorWindow window)
         {
+            if (window == null) return;
             var pos = GetOptimalTabScrollerPosition(window);
 
             if (!pos.Approx(0))
                 pos += nonZeroTabScrollOffset;
 
-            GetDockArea(window).SetFieldValue("m_ScrollOffset", pos);
+            var dockArea = GetDockArea(window);
+            if (dockArea != null && dockArea.GetFieldValue("m_ScrollOffset", false) != null)
+                dockArea.SetFieldValue("m_ScrollOffset", pos, false);
 
         }
         static void EnsureActiveTabsVisibleOnScroller() => allEditorWindows.Where(r => r.hasFocus && !r.maximized && r.docked).ForEach(r => EnsureTabVisibleOnScroller(r));
 
         static float GetOptimalTabScrollerPosition(EditorWindow activeTab)
         {
+            if (activeTab == null) return 0;
 
             var dockArea = GetDockArea(activeTab);
+            if (dockArea == null) return 0;
+            if (dockArea.GetType().GetMethod("GetTabWidth", maxBindingFlags, null, new[] { typeof(GUIStyle), typeof(EditorWindow) }, null) == null) return 0;
+
             var tabAreaRectObject = dockArea.GetFieldValue("m_TabAreaRect", false);
             var tabAreaWidth = tabAreaRectObject is Rect tabAreaRect ? tabAreaRect.width : 0f;
 
@@ -1730,8 +1737,8 @@ namespace VTabs
                 if (v.GetFieldValue<List<EditorWindow>>("m_Panes", false) is List<EditorWindow> panes && panes.Contains(window))
                     return v;
 
-                TryEnqueue(v.GetPropertyValue("parent", false));
-                if (v.GetPropertyValue("children", false) is IEnumerable ch)
+                TryEnqueue(v.GetPropertyValue("parent", false) ?? v.GetFieldValue("m_Parent", false));
+                if ((v.GetPropertyValue("children", false) ?? v.GetFieldValue("m_Children", false)) is IEnumerable ch)
                 {
                     foreach (var c in ch)
                         TryEnqueue(c);
@@ -1740,7 +1747,17 @@ namespace VTabs
             return null;
         }
 
-        static object GetDockArea(EditorWindow window) => FindViewWithM_PanesContainingWindow(window) ?? window.GetFieldValue("m_Parent");
+        static object GetDockArea(EditorWindow window)
+        {
+            var dockArea = FindViewWithM_PanesContainingWindow(window);
+            if (dockArea != null) return dockArea;
+
+            var parent = window?.GetFieldValue("m_Parent", false);
+            if (parent != null && parent.GetFieldValue<List<EditorWindow>>("m_Panes", false) is List<EditorWindow> panes && panes.Contains(window))
+                return parent;
+
+            return null;
+        }
 
         static List<EditorWindow> GetTabList(EditorWindow window)
         {
