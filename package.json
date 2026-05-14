@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "mcp-google-sheets": "^2.0.1"
+  }
+}
