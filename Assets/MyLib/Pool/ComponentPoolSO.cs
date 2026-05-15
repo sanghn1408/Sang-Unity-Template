@@ -38,13 +38,30 @@ namespace UOP1.Pool
 
 		public override T Request()
 		{
-			T member = base.Request();
+			// ScriptableObject pool state can outlive scene objects. The stack may hold
+			// references whose GameObjects were destroyed; generic `member != null` does not
+			// reliably use Unity's fake-null semantics — cast to UnityEngine.Object first.
+			T member = default;
+			while (Available.Count > 0)
+			{
+				member = Available.Pop();
+				if ((UnityEngine.Object)member != null)
+					break;
+				member = default;
+			}
+
+			if ((UnityEngine.Object)member == null)
+				member = Create();
+
 			member.gameObject.SetActive(true);
 			return member;
 		}
 
 		public override void Return(T member)
 		{
+			if ((UnityEngine.Object)member == null)
+				return;
+
 			member.transform.SetParent(PoolRoot.transform);
 			member.gameObject.SetActive(false);
 			base.Return(member);

@@ -1,0 +1,20 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="project://database/Assets/Auto UI Generator/Generated UI Toolkit/Root.uss" />
+    <ui:VisualElement class="root">
+        <ui:VisualElement class="canvas">
+            <ui:VisualElement class="el_0">
+                <ui:VisualElement class="el_3">
+                </ui:VisualElement>
+                <ui:VisualElement class="el_4">
+                </ui:VisualElement>
+                <ui:Label class="el_5" text="W Best: 3000" />
+                <ui:Label class="el_6" text="1000000" />
+                <ui:Label class="el_7" text="Di chuyen de ngam ban" />
+            </ui:VisualElement>
+            <ui:VisualElement class="el_1">
+            </ui:VisualElement>
+            <ui:VisualElement class="el_2">
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

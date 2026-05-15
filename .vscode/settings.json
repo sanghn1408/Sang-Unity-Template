@@ -57,5 +57,7 @@
         "Temp/": true
     },
     "dotnet.defaultSolution": "Sang-Unity-Template.sln",
-    "dotrush.roslyn.projectOrSolutionFiles": []
+    "dotrush.roslyn.projectOrSolutionFiles": [
+        "c:\\PackUnity\\Sang-Unity-Template\\Sang-Unity-Template.sln"
+    ]
 }

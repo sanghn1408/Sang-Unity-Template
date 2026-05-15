@@ -1,0 +1,118 @@
+.unity-text-element {
+    color: rgba(255, 255, 255, 1);
+}
+.root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+.canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+.el_0 {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-image: url("project://database/Assets/Auto UI Generator/Samples/Images/Elements/Main Menu.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    background-color: transparent;
+}
+.el_1 {
+    position: absolute;
+    right: 26px;
+    top: 90px;
+    width: 160px;
+    height: 160px;
+    background-image: url("project://database/Assets/Auto UI Generator/Samples/Images/Elements/Group 16.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    background-color: transparent;
+}
+.el_2 {
+    position: absolute;
+    left: 30px;
+    top: 90px;
+    width: 152px;
+    height: 156px;
+    background-image: url("project://database/Assets/Auto UI Generator/Samples/Images/Elements/Group 38605.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    background-color: transparent;
+}
+.el_3 {
+    position: absolute;
+    right: 257px;
+    bottom: 57px;
+    width: 256px;
+    height: 256px;
+    background-image: url("project://database/Assets/Auto UI Generator/Samples/Images/Elements/Rectangle 61.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    background-color: transparent;
+}
+.el_4 {
+    position: absolute;
+    left: 256px;
+    bottom: 57px;
+    width: 256px;
+    height: 256px;
+    background-image: url("project://database/Assets/Auto UI Generator/Samples/Images/Elements/Rectangle 61.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    background-color: transparent;
+}
+.el_5 {
+    font-size: 38.47222px;
+    color: rgba(255, 255, 255, 1);
+    -unity-font-definition: url("project://database/Assets/Auto UI Generator/Samples/Fonts/NotoSans-VariableFont_wdth,wght SDF.asset");
+    -unity-font: url("project://database/Assets/Auto UI Generator/Samples/Fonts/NotoSans-VariableFont_wdth,wght.ttf");
+    letter-spacing: 0px;
+    -unity-text-align: middle-center;
+    -unity-text-outline-color: rgba(0, 0, 0, 1);
+    -unity-text-outline-width: 3px;
+    -unity-font-style: bold;
+    position: absolute;
+    left: 50%;
+    margin-left: -138.5px;
+    top: 108px;
+    width: 277px;
+    height: 40px;
+}
+.el_6 {
+    font-size: 69.5238px;
+    color: rgba(255, 255, 255, 1);
+    -unity-font-definition: url("project://database/Assets/Auto UI Generator/Samples/Fonts/NotoSans-VariableFont_wdth,wght SDF.asset");
+    -unity-font: url("project://database/Assets/Auto UI Generator/Samples/Fonts/NotoSans-VariableFont_wdth,wght.ttf");
+    letter-spacing: 0px;
+    -unity-text-align: middle-center;
+    -unity-text-outline-color: rgba(0, 0, 0, 1);
+    -unity-text-outline-width: 3px;
+    -unity-font-style: bold;
+    position: absolute;
+    left: 50%;
+    margin-left: -146px;
+    top: 177px;
+    width: 292px;
+    height: 61px;
+}
+.el_7 {
+    font-size: 66.50793px;
+    color: rgba(255, 255, 255, 1);
+    -unity-font-definition: url("project://database/Assets/Auto UI Generator/Samples/Fonts/NotoSans-VariableFont_wdth,wght SDF.asset");
+    -unity-font: url("project://database/Assets/Auto UI Generator/Samples/Fonts/NotoSans-VariableFont_wdth,wght.ttf");
+    letter-spacing: 0px;
+    -unity-text-align: middle-center;
+    -unity-text-outline-color: rgba(0, 0, 0, 1);
+    -unity-text-outline-width: 3px;
+    -unity-font-style: bold;
+    position: absolute;
+    left: 50%;
+    margin-left: -419px;
+    bottom: 427px;
+    width: 838px;
+    height: 90px;
+}

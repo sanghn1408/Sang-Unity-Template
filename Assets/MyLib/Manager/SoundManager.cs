@@ -23,7 +23,7 @@ public class SoundManager : Singleton<SoundManager>
 
     public AudioCueKey PlaySFX(TypeSound typeSound)
     {
-        Debug.LogError("typeSound" + typeSound.ToString());
+        Debug.Log("typeSound" + typeSound.ToString());
         return _playSFXOn.RaisePlayEvent(_mapper[typeSound], _audioConfig);
     }
 
